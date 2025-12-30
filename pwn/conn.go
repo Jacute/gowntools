@@ -7,39 +7,41 @@ import (
 )
 
 type Conn struct {
-	conn net.Conn
+	conn io.ReadWriteCloser
 }
 
 // NewTCP connects to the address on the "TCP" network
+// Function panics on error
 //
 // Examples:
 //
 //	NewTCP("golang.org:http")
 //	NewTCP("198.51.100.1:80")
-func NewTCP(address string) (Client, error) {
+func NewTCP(address string) Client {
 	c, err := net.Dial("tcp", address)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	return &Conn{
 		conn: c,
-	}, nil
+	}
 }
 
 // NewUDP connects to the address on the "UDP" network
+// Function panics on error
 //
 // Examples:
 //
 //	NewUDP("golang.org:http")
 //	NewUDP("198.51.100.1:80")
-func NewUDP(address string) (Client, error) {
+func NewUDP(address string) Client {
 	c, err := net.Dial("udp", address)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	return &Conn{
 		conn: c,
-	}, nil
+	}
 }
 
 func (c *Conn) Close() error {

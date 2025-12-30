@@ -1,8 +1,11 @@
-module gowntools
+module github.com/Jacute/gowntools
 
 go 1.25.4
 
-require github.com/stretchr/testify v1.11.1
+require (
+	github.com/creack/pty v1.1.24
+	github.com/stretchr/testify v1.11.1
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

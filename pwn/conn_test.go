@@ -1,8 +1,9 @@
 package pwn
 
 import (
-	"gowntools/pwn/testsuite"
 	"testing"
+
+	"github.com/Jacute/gowntools/pwn/testsuite"
 
 	"github.com/stretchr/testify/require"
 )
@@ -15,8 +16,7 @@ func TestReadWrite(t *testing.T) {
 	})
 
 	go st.Listen()
-	c, err := NewTCP(st.Address())
-	require.NoError(t, err)
+	c := NewTCP(st.Address())
 	defer c.Close()
 
 	// read
@@ -54,8 +54,7 @@ func TestReadAll(t *testing.T) {
 	})
 
 	go st.Listen()
-	c, err := NewTCP(st.Address())
-	require.NoError(t, err)
+	c := NewTCP(st.Address())
 	defer c.Close()
 
 	// write
@@ -78,8 +77,7 @@ func TestReadLine(t *testing.T) {
 	})
 
 	go st.Listen()
-	c, err := NewTCP(st.Address())
-	require.NoError(t, err)
+	c := NewTCP(st.Address())
 	defer c.Close()
 
 	// read line
