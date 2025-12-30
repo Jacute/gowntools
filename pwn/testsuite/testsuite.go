@@ -4,34 +4,36 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"sync"
 )
 
-const Port = 8082
-
 type TestSuite struct {
-	server      net.Listener
-	connections []net.Conn
+	server net.Listener
+	wg     *sync.WaitGroup
+	conns  []net.Conn
+	mu     sync.Mutex
 }
 
 func NewTestSuite(network string) (*TestSuite, error) {
-	s, err := net.Listen(network, fmt.Sprintf("127.0.0.1:%d", Port))
+	s, err := net.Listen(network, "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
 	return &TestSuite{
-		server:      s,
-		connections: make([]net.Conn, 0, 1),
+		server: s,
+		wg:     &sync.WaitGroup{},
 	}, nil
 }
 
 func (ts *TestSuite) Close() error {
-	for _, c := range ts.connections {
-		err := c.Close()
-		if err != nil {
-			return err
-		}
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	for _, c := range ts.conns {
+		c.Close()
 	}
-	return ts.server.Close()
+	err := ts.server.Close()
+	return err
 }
 
 func (ts *TestSuite) Address() string {
@@ -50,7 +52,9 @@ func (ts *TestSuite) Listen() {
 			}
 			continue
 		}
-		ts.connections = append(ts.connections, conn)
+		ts.mu.Lock()
+		ts.conns = append(ts.conns, conn)
+		ts.mu.Unlock()
 
 		go handleConn(conn) // отдельная goroutine на клиента
 	}
@@ -66,13 +70,13 @@ func handleConn(conn net.Conn) {
 
 	reader := bufio.NewReader(conn)
 
-	for {
-		msg, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("client disconnected:", addr)
-			return
-		}
-
-		fmt.Printf("recv [%s]: %s", addr, msg)
+	msg, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("client disconnected:", addr)
+		return
 	}
+	msg = msg[:len(msg)-1]
+
+	fmt.Printf("recv [%s]: %s\n", addr, msg)
+	fmt.Fprintf(conn, "echo: %s\n", string(msg))
 }
