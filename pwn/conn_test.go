@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/Jacute/gowntools/pwn/testsuite"
-
 	"github.com/stretchr/testify/require"
 )
 

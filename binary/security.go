@@ -5,13 +5,10 @@ import (
 	"debug/elf"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 )
 
-var (
-	ErrNoDynamicSection = errors.New("no .dynamic section")
-)
+var ErrNoDynamicSection = errors.New("no .dynamic section")
 
 type RelRo uint8
 
@@ -51,19 +48,6 @@ func isNXEnable(progs []*elf.Prog) bool {
 		}
 	}
 	return nx
-}
-
-func readSection(name string, sections []*elf.Section) ([]byte, error) {
-	for _, sec := range sections {
-		if sec.Name == name {
-			data, err := io.ReadAll(sec.Open())
-			if err != nil {
-				return nil, err
-			}
-			return data, err
-		}
-	}
-	return nil, fmt.Errorf("no section with name %s", name)
 }
 
 func scanRelRo(f *elf.File, dynamic *elf.Section, order binary.ByteOrder) (RelRo, error) {

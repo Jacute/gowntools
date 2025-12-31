@@ -117,11 +117,11 @@ func TestGetSymbolAddr(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(tt *testing.T) {
 			bn, err := AnalyzeBinary(tc.path)
-			require.NoError(t, err)
+			require.NoError(tt, err)
 
 			addr, err := bn.GetSymbolAddr("win")
-			require.NoError(t, err)
-			require.Equal(t, tc.expected, addr)
+			require.NoError(tt, err)
+			require.Equal(tt, tc.expected, addr)
 		})
 	}
 }

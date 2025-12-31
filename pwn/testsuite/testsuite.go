@@ -66,7 +66,11 @@ func handleConn(conn net.Conn) {
 	addr := conn.RemoteAddr().String()
 	fmt.Println("client connected:", addr)
 
-	conn.Write([]byte("hello\n"))
+	_, err := conn.Write([]byte("hello\n"))
+	if err != nil {
+		fmt.Printf("error writing: %s", err.Error())
+		return
+	}
 
 	reader := bufio.NewReader(conn)
 

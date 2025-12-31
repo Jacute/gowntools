@@ -49,7 +49,7 @@ func (a Addr) String() string {
 	return fmt.Sprintf("0x%x", uint64(a))
 }
 
-type BinaryInfo struct {
+type Info struct {
 	symbols map[string]*elf.Symbol
 
 	Arch          Arch
@@ -63,7 +63,7 @@ type BinaryInfo struct {
 	// Compiler string
 }
 
-func (bi *BinaryInfo) String() string {
+func (bi *Info) String() string {
 	var builder strings.Builder
 
 	builder.WriteString("=== BINARY INFO ===\n")
@@ -104,8 +104,8 @@ func (bi *BinaryInfo) String() string {
 	return builder.String()
 }
 
-func AnalyzeBinary(path string) (*BinaryInfo, error) {
-	var info *BinaryInfo
+func AnalyzeBinary(path string) (*Info, error) {
+	var info *Info
 	var openErr error
 	if ef, err := elf.Open(path); err == nil {
 		info, openErr = scanELF(ef)
@@ -124,7 +124,7 @@ func AnalyzeBinary(path string) (*BinaryInfo, error) {
 	return info, nil
 }
 
-func (bi *BinaryInfo) GetSymbolAddr(symbolName string) (Addr, error) {
+func (bi *Info) GetSymbolAddr(symbolName string) (Addr, error) {
 	symbol, ok := bi.symbols[symbolName]
 	if !ok {
 		return 0, fmt.Errorf("symbol %s not found", symbolName)
@@ -178,8 +178,8 @@ func machoArch(c macho.Cpu) Arch {
 	}
 }
 
-func scanELF(f *elf.File) (info *BinaryInfo, err error) {
-	info = &BinaryInfo{
+func scanELF(f *elf.File) (info *Info, err error) {
+	info = &Info{
 		OS:        OSLinux,
 		Arch:      elfArch(f.Machine),
 		ByteOrder: f.FileHeader.ByteOrder,
@@ -217,6 +217,9 @@ func scanELF(f *elf.File) (info *BinaryInfo, err error) {
 	info.symbols = symbols
 
 	info.Security.RelRo, err = scanRelRo(f, dynamic, info.ByteOrder)
+	if err != nil {
+		return nil, err
+	}
 	info.Security.PIEEnable = f.Type == elf.ET_DYN
 	if _, ok := symbols["__stack_chk_fail"]; ok {
 		info.Security.CanaryEnable = true
@@ -226,11 +229,11 @@ func scanELF(f *elf.File) (info *BinaryInfo, err error) {
 	return info, nil
 }
 
-func scanPE(f *pe.File) (info *BinaryInfo, err error) {
+func scanPE(f *pe.File) (info *Info, err error) {
 	panic("not implemented")
 }
 
-func scanMacho(f *macho.File) (info *BinaryInfo, err error) {
+func scanMacho(f *macho.File) (info *Info, err error) {
 	panic("not implemented")
 }
 
