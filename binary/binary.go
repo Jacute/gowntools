@@ -271,8 +271,8 @@ func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, er
 		syms = append(syms, dynSyms...)
 	}
 
-	for _, s := range syms {
-		symbols[s.Name] = &s
+	for i := range syms {
+		symbols[syms[i].Name] = &syms[i]
 	}
 
 	return symbols, nil

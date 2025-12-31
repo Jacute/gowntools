@@ -99,7 +99,7 @@ func (c *Conn) ReadUntil(data []byte) (out []byte, err error) {
 		_, err = c.conn.Read(ch)
 		if err != nil {
 			if err == io.EOF {
-				return nil, err
+				return out, err
 			}
 			return nil, err
 		}
@@ -112,6 +112,9 @@ func (c *Conn) ReadUntil(data []byte) (out []byte, err error) {
 func (c *Conn) ReadLine() ([]byte, error) {
 	out, err := c.ReadUntil([]byte("\n"))
 	if err != nil {
+		if err == io.EOF {
+			return out, err
+		}
 		return nil, err
 	}
 	out = out[:len(out)-1]

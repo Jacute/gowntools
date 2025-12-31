@@ -1,18 +1,15 @@
 package payload
 
-import "github.com/Jacute/gowntools/binary"
+import (
+	bin "encoding/binary"
+
+	"github.com/Jacute/gowntools/binary"
+)
 
 func P64(addr binary.Addr) []byte {
-	return []byte{
-		byte(addr >> 56),
-		byte(addr >> 48),
-		byte(addr >> 40),
-		byte(addr >> 32),
-		byte(addr >> 24),
-		byte(addr >> 16),
-		byte(addr >> 8),
-		byte(addr),
-	}
+	buf := make([]byte, 8)
+	bin.LittleEndian.PutUint64(buf, uint64(addr))
+	return buf
 }
 
 func P32(addr binary.Addr) []byte {

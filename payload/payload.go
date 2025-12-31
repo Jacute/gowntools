@@ -1,6 +1,10 @@
 package payload
 
-import "github.com/Jacute/gowntools/binary"
+import (
+	"bytes"
+
+	"github.com/Jacute/gowntools/binary"
+)
 
 type PayloadBuilder struct {
 	payload []byte
@@ -17,9 +21,7 @@ func NewPayloadBuilder() *PayloadBuilder {
 // For example, if you want to fill the payload with 10 bytes of value 0x00,
 // you can call pb.Fill(0x00, 10).
 func (pb *PayloadBuilder) Fill(b byte, n int) {
-	for range n {
-		pb.AppendByte(b)
-	}
+	pb.Append(bytes.Repeat([]byte{b}, n))
 }
 
 func (pb *PayloadBuilder) Addr64(addr binary.Addr) {

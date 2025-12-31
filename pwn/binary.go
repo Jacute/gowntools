@@ -4,8 +4,7 @@ import (
 	"errors"
 	"io"
 	"os/exec"
-
-	"github.com/creack/pty"
+	"syscall"
 )
 
 var (
@@ -13,8 +12,10 @@ var (
 )
 
 type Binary struct {
-	cmd      *exec.Cmd
-	terminal io.ReadWriteCloser
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
+	stderr io.ReadCloser
 }
 
 // NewBinary creates a new binary client given a path to a binary.
@@ -23,29 +24,49 @@ type Binary struct {
 func NewBinary(path string) Client {
 	cmd := exec.Command(path)
 
-	ptmx, err := pty.Start(cmd)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		panic(err)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		panic(err)
+	}
+
+	err = cmd.Start()
 	if err != nil {
 		panic(err)
 	}
 
 	return &Conn{
 		conn: &Binary{
-			cmd:      cmd,
-			terminal: ptmx,
+			cmd:    cmd,
+			stdin:  stdin,
+			stdout: stdout,
+			stderr: stderr,
 		},
 	}
 }
 
 func (bn *Binary) Read(b []byte) (n int, err error) {
-	return bn.terminal.Read(b)
+	return bn.stdout.Read(b)
 }
 
 func (bn *Binary) Write(b []byte) (n int, err error) {
-	return bn.terminal.Write(b)
+	return bn.stdin.Write(b)
 }
 
 func (bn *Binary) Close() error {
-	return bn.terminal.Close()
+	bn.stdin.Close()
+	bn.stdout.Close()
+	bn.stderr.Close()
+	return bn.cmd.Process.Signal(syscall.SIGINT)
 }
 
 func (bn *Binary) Pid() int {
