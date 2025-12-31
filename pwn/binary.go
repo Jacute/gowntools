@@ -1,10 +1,15 @@
 package pwn
 
 import (
+	"errors"
 	"io"
 	"os/exec"
 
 	"github.com/creack/pty"
+)
+
+var (
+	errIncorrectClient = errors.New("client should has pwn.Binary type")
 )
 
 type Binary struct {

@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -fno-stack-protector -no-pie -O0 -g
+CFLAGS := -fno-stack-protector -no-pie -O0
 
 TARGET := main
 

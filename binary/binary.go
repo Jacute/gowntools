@@ -43,6 +43,12 @@ func (a *Arch) String() string {
 	return string(*a)
 }
 
+type Addr uint64
+
+func (a Addr) String() string {
+	return fmt.Sprintf("0x%x", uint64(a))
+}
+
 type BinaryInfo struct {
 	symbols map[string]*elf.Symbol
 
@@ -118,13 +124,13 @@ func AnalyzeBinary(path string) (*BinaryInfo, error) {
 	return info, nil
 }
 
-func (bi *BinaryInfo) GetSymbolAddr(symbolName string) (uint64, error) {
+func (bi *BinaryInfo) GetSymbolAddr(symbolName string) (Addr, error) {
 	symbol, ok := bi.symbols[symbolName]
 	if !ok {
 		return 0, fmt.Errorf("symbol %s not found", symbolName)
 	}
 
-	return symbol.Value, nil
+	return Addr(symbol.Value), nil
 }
 
 func elfArch(m elf.Machine) Arch {
@@ -252,13 +258,17 @@ func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, er
 	var syms []elf.Symbol
 	var err error
 
-	if staticLinking {
-		syms, err = f.Symbols()
-	} else {
-		syms, err = f.DynamicSymbols()
-	}
+	syms, err = f.Symbols()
 	if err != nil {
 		return nil, err
+	}
+
+	if !staticLinking {
+		dynSyms, err := f.DynamicSymbols()
+		if err != nil {
+			return nil, err
+		}
+		syms = append(syms, dynSyms...)
 	}
 
 	for _, s := range syms {
