@@ -44,6 +44,8 @@ func (a *Arch) String() string {
 }
 
 type BinaryInfo struct {
+	symbols map[string]*elf.Symbol
+
 	Arch          Arch
 	OS            OS
 	Compiler      string
@@ -114,6 +116,15 @@ func AnalyzeBinary(path string) (*BinaryInfo, error) {
 	}
 
 	return info, nil
+}
+
+func (bi *BinaryInfo) GetSymbolAddr(symbolName string) (uint64, error) {
+	symbol, ok := bi.symbols[symbolName]
+	if !ok {
+		return 0, fmt.Errorf("symbol %s not found", symbolName)
+	}
+
+	return symbol.Value, nil
 }
 
 func elfArch(m elf.Machine) Arch {
@@ -193,19 +204,17 @@ func scanELF(f *elf.File) (info *BinaryInfo, err error) {
 		info.StaticLinking = true
 	}
 
-	var symbols []elf.Symbol
-	if info.StaticLinking {
-		symbols, err = f.Symbols()
-	} else {
-		symbols, err = f.DynamicSymbols()
-	}
+	symbols, err := loadELFSymbols(f, info.StaticLinking)
 	if err != nil {
 		return nil, err
 	}
+	info.symbols = symbols
 
 	info.Security.RelRo, err = scanRelRo(f, dynamic, info.ByteOrder)
 	info.Security.PIEEnable = f.Type == elf.ET_DYN
-	info.Security.CanaryEnable = symbolsContains(symbols, "__stack_chk_fail")
+	if _, ok := symbols["__stack_chk_fail"]; ok {
+		info.Security.CanaryEnable = true
+	}
 	info.Security.NXEnable = isNXEnable(f.Progs)
 
 	return info, nil
@@ -235,4 +244,26 @@ func getSection(sections []*elf.Section, name string) (*elf.Section, error) {
 		}
 	}
 	return nil, fmt.Errorf("section with name %s not found", name)
+}
+
+func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, error) {
+	symbols := make(map[string]*elf.Symbol)
+
+	var syms []elf.Symbol
+	var err error
+
+	if staticLinking {
+		syms, err = f.Symbols()
+	} else {
+		syms, err = f.DynamicSymbols()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range syms {
+		symbols[s.Name] = &s
+	}
+
+	return symbols, nil
 }

@@ -3,7 +3,7 @@
 
 
 void win() {
-    system("echo win");
+    system("id");
 }
 
 void main() {
