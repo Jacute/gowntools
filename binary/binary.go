@@ -4,6 +4,7 @@ import (
 	"debug/elf"
 	"debug/macho"
 	"debug/pe"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -38,6 +39,7 @@ type BinaryInfo struct {
 	OS            OS
 	Compiler      string
 	StaticLinking bool
+	ByteOrder     binary.ByteOrder
 	Security      *SecurityInfo
 	// Packer string
 	// Language string
@@ -57,11 +59,13 @@ func AnalyzeBinary(path string) (*BinaryInfo, error) {
 	var security *SecurityInfo
 	var compiler string
 	var staticLinking bool
+	var order binary.ByteOrder
 
 	if ef, err := elf.Open(path); err == nil {
 		os = OSLinux
 		arch = elfArch(ef.Machine)
 		security, compiler, staticLinking, err = scanELF(ef)
+		order = ef.FileHeader.ByteOrder
 		if err != nil {
 			return nil, err
 		}
@@ -76,6 +80,7 @@ func AnalyzeBinary(path string) (*BinaryInfo, error) {
 		os = OSMac
 		arch = machoArch(mf.Cpu)
 		security, compiler, staticLinking, err = scanMacho(mf)
+		order = mf.ByteOrder
 		if err != nil {
 			return nil, err
 		}
@@ -87,6 +92,7 @@ func AnalyzeBinary(path string) (*BinaryInfo, error) {
 		Compiler:      compiler,
 		StaticLinking: staticLinking,
 		Security:      security,
+		ByteOrder:     order,
 	}, nil
 }
 
@@ -151,8 +157,8 @@ func scanELF(f *elf.File) (security *SecurityInfo, compiler string, staticLinkin
 		}
 	}
 
-	staticLinkingEnable = f.Type != elf.ET_DYN
-	security, err = scanELFSecurity(f)
+	staticLinkingEnable = !sectionsContains(f.Sections, ".dynamic")
+	security, err = scanELFSecurity(f, staticLinkingEnable)
 	if err != nil {
 		return nil, "", false, err
 	}

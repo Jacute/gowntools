@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -8,52 +9,57 @@ import (
 
 func TestAnalyzeBinary(t *testing.T) {
 	testcases := []struct {
-		name                  string
-		path                  string
-		expectedCompiler      string
-		expectedOS            OS
-		expectedArch          Arch
-		expectedStaticLinking bool
-		expectedErr           error
-		expectedSecurityInfo  *SecurityInfo
+		name            string
+		path            string
+		expectedBinInfo *BinaryInfo
+		expectedErr     error
 	}{
 		{
-			name:                  "static linking amd64 linux",
-			path:                  "./testdata/linux_amd64/static_main",
-			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
-			expectedOS:            OSLinux,
-			expectedArch:          ArchAmd64,
-			expectedStaticLinking: true,
-			expectedSecurityInfo: &SecurityInfo{
-				CanaryEnable: true,
-				PIEEnable:    false,
-				NXEnable:     true,
+			name: "static linking with all defs | amd64 linux",
+			path: "./testdata/linux_amd64/static_main",
+			expectedBinInfo: &BinaryInfo{
+				Compiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+				OS:            OSLinux,
+				Arch:          ArchAmd64,
+				StaticLinking: true,
+				ByteOrder:     binary.LittleEndian,
+				Security: &SecurityInfo{
+					CanaryEnable: true,
+					PIEEnable:    false,
+					NXEnable:     true,
+				},
 			},
 		},
 		{
-			name:                  "dynamic linking amd64 linux",
-			path:                  "./testdata/linux_amd64/dynamic_main",
-			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
-			expectedOS:            OSLinux,
-			expectedArch:          ArchAmd64,
-			expectedStaticLinking: false,
-			expectedSecurityInfo: &SecurityInfo{
-				CanaryEnable: true,
-				PIEEnable:    true,
-				NXEnable:     true,
+			name: "dynamic linking with all defs | amd64 linux",
+			path: "./testdata/linux_amd64/dynamic_main",
+			expectedBinInfo: &BinaryInfo{
+				Compiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+				OS:            OSLinux,
+				Arch:          ArchAmd64,
+				StaticLinking: false,
+				ByteOrder:     binary.LittleEndian,
+				Security: &SecurityInfo{
+					CanaryEnable: true,
+					PIEEnable:    true,
+					NXEnable:     true,
+				},
 			},
 		},
 		{
-			name:                  "dynamic linking without pie amd64 linux",
-			path:                  "./testdata/linux_amd64/dynamic_main",
-			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
-			expectedOS:            OSLinux,
-			expectedArch:          ArchAmd64,
-			expectedStaticLinking: false,
-			expectedSecurityInfo: &SecurityInfo{
-				CanaryEnable: true,
-				PIEEnable:    false,
-				NXEnable:     true,
+			name: "dynamic linking without pie | amd64 linux",
+			path: "./testdata/linux_amd64/no_pie_main",
+			expectedBinInfo: &BinaryInfo{
+				Compiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+				OS:            OSLinux,
+				Arch:          ArchAmd64,
+				StaticLinking: false,
+				ByteOrder:     binary.LittleEndian,
+				Security: &SecurityInfo{
+					CanaryEnable: true,
+					PIEEnable:    false,
+					NXEnable:     true,
+				},
 			},
 		},
 	}
@@ -62,12 +68,7 @@ func TestAnalyzeBinary(t *testing.T) {
 		t.Run(tc.name, func(tt *testing.T) {
 			info, err := AnalyzeBinary(tc.path)
 			require.Equal(t, tc.expectedErr, err)
-
-			require.Equal(t, tc.expectedCompiler, info.Compiler)
-			require.Equal(t, tc.expectedOS, info.OS)
-			require.Equal(t, tc.expectedArch, info.Arch)
-			require.Equal(t, tc.expectedStaticLinking, info.StaticLinking)
-			require.Equal(t, tc.expectedSecurityInfo, info.Security)
+			require.Equal(t, tc.expectedBinInfo, info)
 		})
 	}
 }
