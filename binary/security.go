@@ -1,7 +1,9 @@
 package binary
 
 import (
+	"bufio"
 	"debug/elf"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -11,34 +13,33 @@ var (
 	ErrNoDynamicSection = errors.New("no .dynamic section")
 )
 
+type RelRo uint8
+
+const (
+	RelRoEnable RelRo = iota
+	RelRoPartial
+	RelRoDisable
+	RelRoUnknown
+)
+
+func (r RelRo) String() string {
+	switch r {
+	case RelRoEnable:
+		return "enable"
+	case RelRoPartial:
+		return "partial"
+	case RelRoDisable:
+		return "disable"
+	default:
+		return "unknown"
+	}
+}
+
 type SecurityInfo struct {
+	RelRo        RelRo
 	CanaryEnable bool
 	NXEnable     bool
 	PIEEnable    bool
-}
-
-func (s *SecurityInfo) String() string {
-	return fmt.Sprintf("=== SECURITY INFO ===\ncanary: %v\nnx: %v\npie: %v\n", s.CanaryEnable, s.NXEnable, s.PIEEnable)
-}
-
-func scanELFSecurity(f *elf.File, staticLinking bool) (security *SecurityInfo, err error) {
-	var symbols []elf.Symbol
-	if staticLinking {
-		symbols, err = f.Symbols()
-	} else {
-		symbols, err = f.DynamicSymbols()
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	security = &SecurityInfo{
-		CanaryEnable: symbolsContains(symbols, "__stack_chk_fail"),
-		PIEEnable:    f.Type == elf.ET_DYN,
-		NXEnable:     isNXEnable(f.Progs),
-	}
-
-	return security, nil
 }
 
 func isNXEnable(progs []*elf.Prog) bool {
@@ -65,11 +66,38 @@ func readSection(name string, sections []*elf.Section) ([]byte, error) {
 	return nil, fmt.Errorf("no section with name %s", name)
 }
 
-func sectionsContains(sections []*elf.Section, name string) bool {
-	for _, sec := range sections {
-		if sec.Name == name {
-			return true
+func scanRelRo(f *elf.File, dynamic *elf.Section, order binary.ByteOrder) (RelRo, error) {
+	ptGnuRelRoEnable := false
+	for _, prog := range f.Progs {
+		if prog.ProgHeader.Type == elf.PT_GNU_RELRO {
+			ptGnuRelRoEnable = true
+			break
 		}
 	}
-	return false
+
+	if !ptGnuRelRoEnable {
+		return RelRoDisable, nil
+	}
+
+	if dynamic == nil {
+		return RelRoPartial, nil
+	}
+
+	r := bufio.NewReader(dynamic.Open())
+
+	for {
+		var dyn elf.Dyn64
+		if err := binary.Read(r, order, &dyn); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return RelRoUnknown, err
+		}
+
+		if dyn.Tag == int64(elf.DT_FLAGS) && dyn.Val&uint64(elf.DF_BIND_NOW) != 0 {
+			return RelRoEnable, nil
+		}
+	}
+
+	return RelRoPartial, nil
 }

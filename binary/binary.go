@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 var (
@@ -24,6 +25,10 @@ var (
 	OSUnknown OS = "Unknown"
 )
 
+func (o *OS) String() string {
+	return string(*o)
+}
+
 type Arch string
 
 var (
@@ -33,6 +38,10 @@ var (
 	ArchArm32   Arch = "arm"
 	ArchUnknown Arch = "Unknown"
 )
+
+func (a *Arch) String() string {
+	return string(*a)
+}
 
 type BinaryInfo struct {
 	Arch          Arch
@@ -47,53 +56,64 @@ type BinaryInfo struct {
 }
 
 func (bi *BinaryInfo) String() string {
-	return fmt.Sprintf(
-		"=== BINARY INFO ===\narch: %s\nos: %s\ncompiler: %s\nstatic linking: %t\n%s",
-		bi.Arch, bi.OS, bi.Compiler, bi.StaticLinking, bi.Security,
-	)
+	var builder strings.Builder
+
+	builder.WriteString("=== BINARY INFO ===\n")
+
+	builder.WriteString("arch: ")
+	builder.WriteString(bi.Arch.String())
+	builder.WriteByte('\n')
+
+	builder.WriteString("os: ")
+	builder.WriteString(bi.OS.String())
+	builder.WriteByte('\n')
+
+	builder.WriteString("compiler: ")
+	builder.WriteString(bi.Compiler)
+	builder.WriteByte('\n')
+
+	builder.WriteString("linking: ")
+	if bi.StaticLinking {
+		builder.WriteString("static\n")
+	} else {
+		builder.WriteString("dynamic\n")
+	}
+
+	builder.WriteString("=== SECURITY ===\n")
+	if bi.Security == nil {
+		builder.WriteString("unknown\n")
+		return builder.String()
+	}
+
+	builder.WriteString("relro: ")
+	builder.WriteString(bi.Security.RelRo.String())
+	builder.WriteByte('\n')
+
+	fmt.Fprintf(&builder, "canary: %t\n", bi.Security.CanaryEnable)
+	fmt.Fprintf(&builder, "pie: %t\n", bi.Security.PIEEnable)
+	fmt.Fprintf(&builder, "nx: %t\n", bi.Security.NXEnable)
+
+	return builder.String()
 }
 
 func AnalyzeBinary(path string) (*BinaryInfo, error) {
-	arch := ArchUnknown
-	os := OSUnknown
-	var security *SecurityInfo
-	var compiler string
-	var staticLinking bool
-	var order binary.ByteOrder
-
+	var info *BinaryInfo
+	var openErr error
 	if ef, err := elf.Open(path); err == nil {
-		os = OSLinux
-		arch = elfArch(ef.Machine)
-		security, compiler, staticLinking, err = scanELF(ef)
-		order = ef.FileHeader.ByteOrder
-		if err != nil {
-			return nil, err
-		}
+		info, openErr = scanELF(ef)
 	} else if pf, err := pe.Open(path); err == nil {
-		os = OSWindows
-		arch = peArch(pf.Machine)
-		security, compiler, staticLinking, err = scanPE(pf)
-		if err != nil {
-			return nil, err
-		}
+		info, openErr = scanPE(pf)
 	} else if mf, err := macho.Open(path); err == nil {
-		os = OSMac
-		arch = machoArch(mf.Cpu)
-		security, compiler, staticLinking, err = scanMacho(mf)
-		order = mf.ByteOrder
-		if err != nil {
-			return nil, err
-		}
+		info, openErr = scanMacho(mf)
+	} else {
+		return nil, err
 	}
 
-	return &BinaryInfo{
-		Arch:          arch,
-		OS:            os,
-		Compiler:      compiler,
-		StaticLinking: staticLinking,
-		Security:      security,
-		ByteOrder:     order,
-	}, nil
+	if openErr != nil {
+		return nil, openErr
+	}
+
+	return info, nil
 }
 
 func elfArch(m elf.Machine) Arch {
@@ -141,13 +161,23 @@ func machoArch(c macho.Cpu) Arch {
 	}
 }
 
-func scanELF(f *elf.File) (security *SecurityInfo, compiler string, staticLinkingEnable bool, err error) {
+func scanELF(f *elf.File) (info *BinaryInfo, err error) {
+	info = &BinaryInfo{
+		OS:        OSLinux,
+		Arch:      elfArch(f.Machine),
+		ByteOrder: f.FileHeader.ByteOrder,
+		Security: &SecurityInfo{
+			RelRo: RelRoUnknown,
+		},
+	}
+
+	var compiler string
 	for _, sec := range f.Sections {
 		if sec.Name == ".comment" {
 			f := sec.Open()
 			data, err := io.ReadAll(f)
 			if err != nil {
-				return nil, "", false, err
+				return nil, err
 			}
 			compiler = string(data)
 			if compiler[len(compiler)-1] == '\x00' {
@@ -156,21 +186,36 @@ func scanELF(f *elf.File) (security *SecurityInfo, compiler string, staticLinkin
 			break
 		}
 	}
+	info.Compiler = compiler
 
-	staticLinkingEnable = !sectionsContains(f.Sections, ".dynamic")
-	security, err = scanELFSecurity(f, staticLinkingEnable)
-	if err != nil {
-		return nil, "", false, err
+	dynamic, err := getSection(f.Sections, ".dynamic")
+	if dynamic == nil && err != nil {
+		info.StaticLinking = true
 	}
 
-	return security, compiler, staticLinkingEnable, nil
+	var symbols []elf.Symbol
+	if info.StaticLinking {
+		symbols, err = f.Symbols()
+	} else {
+		symbols, err = f.DynamicSymbols()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	info.Security.RelRo, err = scanRelRo(f, dynamic, info.ByteOrder)
+	info.Security.PIEEnable = f.Type == elf.ET_DYN
+	info.Security.CanaryEnable = symbolsContains(symbols, "__stack_chk_fail")
+	info.Security.NXEnable = isNXEnable(f.Progs)
+
+	return info, nil
 }
 
-func scanPE(f *pe.File) (security *SecurityInfo, compiler string, staticLinking bool, err error) {
+func scanPE(f *pe.File) (info *BinaryInfo, err error) {
 	panic("not implemented")
 }
 
-func scanMacho(f *macho.File) (security *SecurityInfo, compiler string, staticLinking bool, err error) {
+func scanMacho(f *macho.File) (info *BinaryInfo, err error) {
 	panic("not implemented")
 }
 
@@ -181,4 +226,13 @@ func symbolsContains(symbols []elf.Symbol, name string) bool {
 		}
 	}
 	return false
+}
+
+func getSection(sections []*elf.Section, name string) (*elf.Section, error) {
+	for _, sec := range sections {
+		if sec.Name == name {
+			return sec, nil
+		}
+	}
+	return nil, fmt.Errorf("section with name %s not found", name)
 }

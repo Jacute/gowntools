@@ -15,7 +15,7 @@ func TestAnalyzeBinary(t *testing.T) {
 		expectedErr     error
 	}{
 		{
-			name: "static linking with all defs | amd64 linux",
+			name: "static linking without pie | amd64 linux",
 			path: "./testdata/linux_amd64/static_main",
 			expectedBinInfo: &BinaryInfo{
 				Compiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
@@ -24,6 +24,7 @@ func TestAnalyzeBinary(t *testing.T) {
 				StaticLinking: true,
 				ByteOrder:     binary.LittleEndian,
 				Security: &SecurityInfo{
+					RelRo:        RelRoPartial,
 					CanaryEnable: true,
 					PIEEnable:    false,
 					NXEnable:     true,
@@ -40,6 +41,7 @@ func TestAnalyzeBinary(t *testing.T) {
 				StaticLinking: false,
 				ByteOrder:     binary.LittleEndian,
 				Security: &SecurityInfo{
+					RelRo:        RelRoEnable,
 					CanaryEnable: true,
 					PIEEnable:    true,
 					NXEnable:     true,
@@ -56,9 +58,27 @@ func TestAnalyzeBinary(t *testing.T) {
 				StaticLinking: false,
 				ByteOrder:     binary.LittleEndian,
 				Security: &SecurityInfo{
+					RelRo:        RelRoPartial,
 					CanaryEnable: true,
 					PIEEnable:    false,
 					NXEnable:     true,
+				},
+			},
+		},
+		{
+			name: "dynamic linking without any defs | amd64 linux",
+			path: "./testdata/linux_amd64/no_defs_main",
+			expectedBinInfo: &BinaryInfo{
+				Compiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+				OS:            OSLinux,
+				Arch:          ArchAmd64,
+				StaticLinking: false,
+				ByteOrder:     binary.LittleEndian,
+				Security: &SecurityInfo{
+					RelRo:        RelRoDisable,
+					CanaryEnable: false,
+					PIEEnable:    false,
+					NXEnable:     false,
 				},
 			},
 		},
