@@ -97,5 +97,31 @@ func TestAnalyzeBinary(t *testing.T) {
 }
 
 func TestGetSymbolAddr(t *testing.T) {
+	testcases := []struct {
+		name     string
+		path     string
+		expected Addr
+	}{
+		{
+			name:     "static",
+			path:     "./testdata/linux_amd64/static_main",
+			expected: Addr(0x0000000000401905),
+		},
+		{
+			name:     "dynamic",
+			path:     "./testdata/linux_amd64/dynamic_main",
+			expected: Addr(0x00000000000011a9),
+		},
+	}
 
+	for _, tc := range testcases {
+		t.Run(tc.name, func(tt *testing.T) {
+			bn, err := AnalyzeBinary(tc.path)
+			require.NoError(t, err)
+
+			addr, err := bn.GetSymbolAddr("win")
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, addr)
+		})
+	}
 }
