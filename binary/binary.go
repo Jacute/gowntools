@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrUnknownArch = errors.New("unknown arch")
-	ErrUnknownOS   = errors.New("unknown os")
+	ErrUnknownArch   = errors.New("unknown arch")
+	ErrUnknownOS     = errors.New("unknown os")
+	ErrUnknownBinary = errors.New("binary type is unknown")
 )
 
 type OS string
@@ -104,6 +105,13 @@ func (bi *Info) String() string {
 	return builder.String()
 }
 
+/*************  ✨ Windsurf Command ⭐  *************/
+// AnalyzeBinary opens the binary file at path and returns an
+// Info struct representing the binary's information. If an
+// error occurs while opening the file, it is returned
+// immediately. Otherwise, the function returns nil and
+// the error.
+/*******  6e3c77c2-4ea2-4bfc-955a-1849762c9c58  *******/
 func AnalyzeBinary(path string) (*Info, error) {
 	var info *Info
 	var openErr error
@@ -114,7 +122,7 @@ func AnalyzeBinary(path string) (*Info, error) {
 	} else if mf, err := macho.Open(path); err == nil {
 		info, openErr = scanMacho(mf)
 	} else {
-		return nil, err
+		return nil, ErrUnknownBinary
 	}
 
 	if openErr != nil {
