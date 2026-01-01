@@ -3,7 +3,7 @@ package pwn
 import (
 	"testing"
 
-	"github.com/Jacute/gowntools/pwn/testsuite"
+	"github.com/Jacute/gowntools/testsuite"
 	"github.com/stretchr/testify/require"
 )
 

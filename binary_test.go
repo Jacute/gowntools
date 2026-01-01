@@ -7,7 +7,7 @@ import (
 )
 
 func TestExploitBinary(t *testing.T) {
-	bn := NewBinary("./testdata/readtest/main")
+	bn := NewBinary("./testdata/readwritetest/main")
 	defer bn.Close()
 
 	ln, err := bn.ReadLine()
