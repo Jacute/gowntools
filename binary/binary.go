@@ -105,13 +105,16 @@ func (bi *Info) String() string {
 	return builder.String()
 }
 
-/*************  ✨ Windsurf Command ⭐  *************/
-// AnalyzeBinary opens the binary file at path and returns an
-// Info struct representing the binary's information. If an
-// error occurs while opening the file, it is returned
-// immediately. Otherwise, the function returns nil and
-// the error.
-/*******  6e3c77c2-4ea2-4bfc-955a-1849762c9c58  *******/
+// AnalyzeBinary analyzes the given binary and returns information about it.
+//
+// The path must be a valid ELF, PE or Mach-O file. If the file is not
+// recognized, an error of type ErrUnknownBinary is returned.
+//
+// The returned Info contains information about the binary's architecture,
+// operating system, compiler, linking, and security.
+//
+// The returned error is nil if the analysis is successful, or an error
+// describing the problem if the analysis fails.
 func AnalyzeBinary(path string) (*Info, error) {
 	var info *Info
 	var openErr error
@@ -132,6 +135,8 @@ func AnalyzeBinary(path string) (*Info, error) {
 	return info, nil
 }
 
+// GetSymbolAddr returns the address of the symbol with the given name.
+// If the symbol is not found, an error is returned.
 func (bi *Info) GetSymbolAddr(symbolName string) (Addr, error) {
 	symbol, ok := bi.symbols[symbolName]
 	if !ok {
