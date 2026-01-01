@@ -36,18 +36,19 @@ type option func(*debugger)
 // a terminal to attach to the process or if the process hasn't attached to
 // gdb after the given timeout.
 //
-// The function try to use terminal
+// The function try to use terminals of different types (tmux, xterm, gnome-terminal)
 func Debug(client Client, opts ...option) error {
+	// get bin from interface Client
 	conn, ok := client.(*conn)
 	if !ok {
 		return errIncorrectClient
 	}
-
 	bin, ok := conn.conn.(*bin)
 	if !ok {
 		return errIncorrectClient
 	}
 
+	// init debugger
 	dbg := &debugger{
 		attachPid: bin.Pid(),
 	}
@@ -64,9 +65,17 @@ func Debug(client Client, opts ...option) error {
 		dbg.term = terminal
 	}
 
+	err := dbg.Start(dbg.term)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
+// WithTerminal returns an option that sets the terminal to use when spawning
+// gdb to attach to the process. If this option is not used, the terminal
+// is tried to be determined automatically.
 func WithTerminal(term terminal) func(*debugger) {
 	return func(client *debugger) {
 		client.term = term
