@@ -8,10 +8,10 @@ import (
 )
 
 var (
-	errIncorrectClient = errors.New("client should has pwn.Binary type")
+	errIncorrectClient = errors.New("client should has pwn.bin type")
 )
 
-type Binary struct {
+type bin struct {
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
@@ -44,8 +44,8 @@ func NewBinary(path string) Client {
 		panic(err)
 	}
 
-	return &Conn{
-		conn: &Binary{
+	return &conn{
+		conn: &bin{
 			cmd:    cmd,
 			stdin:  stdin,
 			stdout: stdout,
@@ -54,21 +54,29 @@ func NewBinary(path string) Client {
 	}
 }
 
-func (bn *Binary) Read(b []byte) (n int, err error) {
+// Read reads data from the binary's stdout.
+// It returns the number of bytes read and any error that occurred.
+func (bn *bin) Read(b []byte) (n int, err error) {
 	return bn.stdout.Read(b)
 }
 
-func (bn *Binary) Write(b []byte) (n int, err error) {
+// Write writes data to the binary's stdin.
+// It returns the number of bytes written and any error that occurred.
+func (bn *bin) Write(b []byte) (n int, err error) {
 	return bn.stdin.Write(b)
 }
 
-func (bn *Binary) Close() error {
+// Close closes all the binary's IO streams and sends a SIGINT signal to the
+// underlying process.
+func (bn *bin) Close() error {
 	bn.stdin.Close()
 	bn.stdout.Close()
 	bn.stderr.Close()
 	return bn.cmd.Process.Signal(syscall.SIGINT)
 }
 
-func (bn *Binary) Pid() int {
+// Pid returns the process ID of the underlying process.
+// It is used to identify the process when debugging.
+func (bn *bin) Pid() int {
 	return bn.cmd.Process.Pid
 }

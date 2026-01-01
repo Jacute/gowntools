@@ -15,50 +15,62 @@ var (
 	ErrTerminalNotFound = errors.New("can't get terminal")
 )
 
+type terminal []string
+
 var (
-	TmuxTerminal  = []string{"tmux", "splitw", "-h"}
-	XtermTerminal = []string{"xterm", "-e"}
-	GnomeTerminal = []string{"gnome-terminal", "--"}
+	TmuxTerminal  = terminal{"tmux", "splitw", "-h"}
+	XtermTerminal = terminal{"xterm", "-e"}
+	GnomeTerminal = terminal{"gnome-terminal", "--"}
 )
 
-func Debug(client Client) error {
-	conn, ok := client.(*Conn)
+type debugger struct {
+	term      terminal
+	attachPid int
+}
+
+type option func(*debugger)
+
+// Debug starts a gdb debugging session for the given client.
+// It returns an error if the client is not a *conn or if the underlying
+// process is not a *bin. The function also returns an error if it can't spawn
+// a terminal to attach to the process or if the process hasn't attached to
+// gdb after the given timeout.
+//
+// The function try to use terminal
+func Debug(client Client, opts ...option) error {
+	conn, ok := client.(*conn)
 	if !ok {
 		return errIncorrectClient
 	}
 
-	bin, ok := conn.conn.(*Binary)
+	bin, ok := conn.conn.(*bin)
 	if !ok {
 		return errIncorrectClient
 	}
 
-	gdbCmd := []string{
-		"gdb",
-		"-q",
-		"-p",
-		fmt.Sprintf("%d", bin.Pid()),
+	dbg := &debugger{
+		attachPid: bin.Pid(),
+	}
+	for _, opt := range opts {
+		opt(dbg)
 	}
 
-	// terminal + gdb
-	terminal, err := getTerminal()
-	if err != nil {
-		return fmt.Errorf("can't get terminal for spawn gdb")
-	}
-
-	args := append(terminal[1:], gdbCmd...)
-	cmd := exec.Command(terminal[0], args...)
-
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	err = waitForAttach(bin.Pid(), attachTimeout)
-	if err != nil {
-		return err
+	// if terminal is not set by option we try to get it automatically
+	if dbg.term == nil {
+		terminal, err := getTerminal()
+		if err != nil {
+			return fmt.Errorf("can't get terminal for spawn gdb")
+		}
+		dbg.term = terminal
 	}
 
 	return nil
+}
+
+func WithTerminal(term terminal) func(*debugger) {
+	return func(client *debugger) {
+		client.term = term
+	}
 }
 
 func getTerminal() ([]string, error) {
@@ -77,11 +89,35 @@ func getTerminal() ([]string, error) {
 	return nil, ErrTerminalNotFound
 }
 
-func waitForAttach(pid int, timeout time.Duration) error {
+func (d *debugger) Start(term terminal) error {
+	gdbCmd := []string{
+		"gdb",
+		"-q",
+		"-p",
+		fmt.Sprintf("%d", d.attachPid),
+	}
+
+	args := append(d.term[1:], gdbCmd...)
+	cmd := exec.Command(d.term[0], args...)
+
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	err = d.waitForAttach(attachTimeout)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *debugger) waitForAttach(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 
 	for time.Now().Before(deadline) {
-		data, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
+		data, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", d.attachPid))
 		if err != nil {
 			return err
 		}

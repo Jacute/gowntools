@@ -6,7 +6,8 @@ import (
 	"net"
 )
 
-type Conn struct {
+// conn is a main
+type conn struct {
 	conn io.ReadWriteCloser
 }
 
@@ -22,7 +23,7 @@ func NewTCP(address string) Client {
 	if err != nil {
 		panic(err)
 	}
-	return &Conn{
+	return &conn{
 		conn: c,
 	}
 }
@@ -39,32 +40,32 @@ func NewUDP(address string) Client {
 	if err != nil {
 		panic(err)
 	}
-	return &Conn{
+	return &conn{
 		conn: c,
 	}
 }
 
-func (c *Conn) Close() error {
+func (c *conn) Close() error {
 	return c.conn.Close()
 }
 
-func (c *Conn) Write(b []byte) (n int, err error) {
+func (c *conn) Write(b []byte) (n int, err error) {
 	return c.conn.Write(b)
 }
 
-func (c *Conn) WriteLine(b []byte) error {
+func (c *conn) WriteLine(b []byte) error {
 	_, err := c.conn.Write(append(b, '\n'))
 	return err
 }
 
-func (c *Conn) Read(b []byte) (n int, err error) {
+func (c *conn) Read(b []byte) (n int, err error) {
 	return c.conn.Read(b)
 }
 
 // ReadAll reads data from the connection until it reaches the end of
 // the connection (EOF). The function returns the data read from the
 // connection and the number of bytes read.
-func (c *Conn) ReadAll() (out []byte, n int, err error) {
+func (c *conn) ReadAll() (out []byte, n int, err error) {
 	tmp := make([]byte, 64)
 
 	var connN int
@@ -93,7 +94,7 @@ func (c *Conn) ReadAll() (out []byte, n int, err error) {
 // and the number of bytes read. If an error occurs, the function returns nil,
 // 0 and the error. If the end of the connection is reached, the function
 // returns nil, 0 and io.EOF.
-func (c *Conn) ReadUntil(data []byte) (out []byte, err error) {
+func (c *conn) ReadUntil(data []byte) (out []byte, err error) {
 	buf := make([]byte, 1)
 	for !(bytes.HasSuffix(out, data)) {
 		n, err := c.conn.Read(buf)
@@ -112,7 +113,7 @@ func (c *Conn) ReadUntil(data []byte) (out []byte, err error) {
 }
 
 // ReadLine reads data from the connection until it finds a newline character.
-func (c *Conn) ReadLine() ([]byte, error) {
+func (c *conn) ReadLine() ([]byte, error) {
 	out, err := c.ReadUntil([]byte("\n"))
 	if err != nil {
 		if err == io.EOF {
