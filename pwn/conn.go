@@ -94,9 +94,9 @@ func (c *Conn) ReadAll() (out []byte, n int, err error) {
 // 0 and the error. If the end of the connection is reached, the function
 // returns nil, 0 and io.EOF.
 func (c *Conn) ReadUntil(data []byte) (out []byte, err error) {
-	ch := make([]byte, 1)
-	for !(len(out) >= len(data) && bytes.Equal(out[len(out)-len(data):], data)) {
-		n, err := c.conn.Read(ch)
+	buf := make([]byte, 1)
+	for !(bytes.HasSuffix(out, data)) {
+		n, err := c.conn.Read(buf)
 		if err != nil {
 			if err == io.EOF {
 				return out, err
@@ -106,7 +106,7 @@ func (c *Conn) ReadUntil(data []byte) (out []byte, err error) {
 		if n == 0 {
 			return out, nil
 		}
-		out = append(out, ch...)
+		out = append(out, buf[:n]...)
 	}
 	return out, nil
 }

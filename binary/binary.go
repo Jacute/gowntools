@@ -182,7 +182,7 @@ func scanELF(f *elf.File) (info *Info, err error) {
 	info = &Info{
 		OS:        OSLinux,
 		Arch:      elfArch(f.Machine),
-		ByteOrder: f.FileHeader.ByteOrder,
+		ByteOrder: f.ByteOrder,
 		Security: &SecurityInfo{
 			RelRo: RelRoUnknown,
 		},
@@ -230,20 +230,29 @@ func scanELF(f *elf.File) (info *Info, err error) {
 }
 
 func scanPE(f *pe.File) (info *Info, err error) {
-	panic("not implemented")
+	info = &Info{
+		OS:        OSWindows,
+		Arch:      peArch(f.Machine),
+		ByteOrder: binary.LittleEndian,
+		Security: &SecurityInfo{
+			RelRo: RelRoUnknown,
+		},
+	}
+	// TODO: scan linking, compiler, security, etc
+	return info, nil
 }
 
 func scanMacho(f *macho.File) (info *Info, err error) {
-	panic("not implemented")
-}
-
-func symbolsContains(symbols []elf.Symbol, name string) bool {
-	for _, s := range symbols {
-		if s.Name == name {
-			return true
-		}
+	info = &Info{
+		OS:        OSMac,
+		Arch:      machoArch(f.Cpu),
+		ByteOrder: f.ByteOrder,
+		Security: &SecurityInfo{
+			RelRo: RelRoUnknown,
+		},
 	}
-	return false
+	// TODO: scan linking, compiler, security, etc
+	return info, nil
 }
 
 func getSection(sections []*elf.Section, name string) (*elf.Section, error) {
