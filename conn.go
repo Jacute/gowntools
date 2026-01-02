@@ -149,30 +149,33 @@ func (c *conn) ReadLine() ([]byte, error) {
 //	c := NewBinary("path/to/binary")
 //	c.Interactive()
 func (c *conn) Interactive() {
-	tcp, ok1 := c.conn.(*net.TCPConn)
-	binary, ok2 := c.conn.(*bin)
+	interactiveIO(c, os.Stdin, os.Stdout)
+}
+
+func interactiveIO(conn *conn, r io.Reader, w io.Writer) {
+	tcp, ok1 := conn.conn.(*net.TCPConn)
+	binary, ok2 := conn.conn.(*bin)
 	if ok1 {
-		interactiveTCP(tcp)
+		interactiveTCP(tcp, r, w)
 	} else if ok2 {
-		interactiveBin(binary)
+		interactiveBin(binary, r, w)
 	} else {
 		panic("interactive mode only supported for TCP or binary")
 	}
 }
 
-func interactiveTCP(tc *net.TCPConn) {
+func interactiveTCP(tc *net.TCPConn, r io.Reader, w io.Writer) {
 	go func() {
-		io.Copy(tc, os.Stdin)
+		io.Copy(tc, r)
 		tc.CloseWrite() // FIN
 	}()
 
-	io.Copy(os.Stdout, tc)
+	io.Copy(w, tc)
 }
 
-func interactiveBin(bn *bin) {
-	go io.Copy(bn.stdin, os.Stdin)
-	go io.Copy(os.Stdout, bn.stdout)
-	go io.Copy(os.Stderr, bn.stderr)
+func interactiveBin(bn *bin, r io.Reader, w io.Writer) {
+	go io.Copy(bn.stdin, r)
+	go io.Copy(w, io.MultiReader(bn.stdout, bn.stderr))
 
 	bn.cmd.Wait()
 }

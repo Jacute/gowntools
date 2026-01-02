@@ -1,6 +1,9 @@
 package pwn
 
 import (
+	"bytes"
+	"net"
+	"strings"
 	"testing"
 
 	"github.com/Jacute/gowntools/testsuite"
@@ -76,13 +79,23 @@ func TestReadLine(t *testing.T) {
 	})
 
 	go st.Listen()
-	c := NewTCP(st.Address())
+	cn, err := net.Dial("tcp", st.Address())
+	require.NoError(t, err)
+	c := &conn{
+		conn: cn,
+	}
 	defer c.Close()
 
 	// read line
 	out, err := c.ReadLine()
 	require.NoError(t, err)
 	require.Equal(t, "hello", string(out))
+
+	in := strings.NewReader("aboba\n")
+	buf := &bytes.Buffer{}
+	interactiveIO(c, in, buf)
+
+	require.Equal(t, "echo: aboba\n", buf.String())
 }
 
 func TestUDP(t *testing.T) {

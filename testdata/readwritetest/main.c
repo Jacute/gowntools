@@ -11,5 +11,6 @@ void main() {
     init();
     puts("hello!");
     fgets(buf, 64, stdin);
+    buf[strcspn(buf, "\n")] = 0;
     printf("input: %s\n", buf);
 }
