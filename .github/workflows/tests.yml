@@ -6,10 +6,9 @@ on:
   pull_request:
     branches: [ master, dev ]
 
-timeout-minutes: 3
-
 jobs:
   tests:
+    timeout-minutes: 3
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
