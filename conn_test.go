@@ -8,7 +8,7 @@ import (
 )
 
 func TestReadWrite(t *testing.T) {
-	st, err := testsuite.NewTestSuite("tcp")
+	st, err := testsuite.NewTCPServer()
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		st.Close()
@@ -46,7 +46,7 @@ func TestReadWrite(t *testing.T) {
 }
 
 func TestReadAll(t *testing.T) {
-	st, err := testsuite.NewTestSuite("tcp")
+	st, err := testsuite.NewTCPServer()
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		st.Close()
@@ -69,7 +69,7 @@ func TestReadAll(t *testing.T) {
 }
 
 func TestReadLine(t *testing.T) {
-	st, err := testsuite.NewTestSuite("tcp")
+	st, err := testsuite.NewTCPServer()
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		st.Close()
@@ -83,4 +83,24 @@ func TestReadLine(t *testing.T) {
 	out, err := c.ReadLine()
 	require.NoError(t, err)
 	require.Equal(t, "hello", string(out))
+}
+
+func TestUDP(t *testing.T) {
+	st, err := testsuite.NewUDPServer()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		st.Close()
+	})
+
+	go st.Listen()
+	c := NewUDP(st.Address())
+	defer c.Close()
+
+	err = c.WriteStringLine("aboba")
+	require.NoError(t, err)
+
+	buf := make([]byte, 64)
+	n, err := c.Read(buf)
+	require.NoError(t, err)
+	require.Equal(t, "echo: aboba\n", string(buf[:n]))
 }
