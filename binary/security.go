@@ -53,7 +53,7 @@ func isNXEnable(progs []*elf.Prog) bool {
 func scanRelRo(f *elf.File, dynamic *elf.Section, order binary.ByteOrder) (RelRo, error) {
 	ptGnuRelRoEnable := false
 	for _, prog := range f.Progs {
-		if prog.ProgHeader.Type == elf.PT_GNU_RELRO {
+		if prog.Type == elf.PT_GNU_RELRO {
 			ptGnuRelRoEnable = true
 			break
 		}

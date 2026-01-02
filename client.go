@@ -4,6 +4,7 @@ import (
 	"io"
 )
 
+// Client is an interface that represents a pwn client (binary, tcp, udp, etc).
 type Client interface {
 	io.ReadWriteCloser
 
@@ -12,4 +13,7 @@ type Client interface {
 	ReadLine() (out []byte, err error)
 
 	WriteLine(b []byte) error
+	WriteStringLine(s string) error
+
+	Interactive()
 }

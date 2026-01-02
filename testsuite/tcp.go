@@ -7,25 +7,26 @@ import (
 	"sync"
 )
 
-type TestSuite struct {
+type TCPServer struct {
 	server net.Listener
 	wg     *sync.WaitGroup
 	conns  []net.Conn
 	mu     sync.Mutex
 }
 
-func NewTestSuite(network string) (*TestSuite, error) {
-	s, err := net.Listen(network, "127.0.0.1:0")
+func NewTCPServer() (*TCPServer, error) {
+	ts := &TCPServer{
+		wg: &sync.WaitGroup{},
+	}
+	s, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
-	return &TestSuite{
-		server: s,
-		wg:     &sync.WaitGroup{},
-	}, nil
+	ts.server = s
+	return ts, nil
 }
 
-func (ts *TestSuite) Close() error {
+func (ts *TCPServer) Close() error {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
@@ -36,14 +37,14 @@ func (ts *TestSuite) Close() error {
 	return err
 }
 
-func (ts *TestSuite) Address() string {
+func (ts *TCPServer) Address() string {
 	return ts.server.Addr().String()
 }
 
 // Listen start accepting connection
 //
 // Blocking function
-func (ts *TestSuite) Listen() {
+func (ts *TCPServer) Listen() {
 	for {
 		conn, err := ts.server.Accept()
 		if err != nil {

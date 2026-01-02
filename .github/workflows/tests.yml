@@ -1,0 +1,43 @@
+name: Tests
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ master, dev ]
+
+jobs:
+  tests:
+    timeout-minutes: 3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      
+      - name: Install gocovmerge
+        run: go install github.com/wadey/gocovmerge@latest
+
+      - name: Install deps
+        run: go mod tidy
+
+      - name: Run tests
+        run: make coverage
+
+      # --- Upload to Codecov ---
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: Jacute/JacFARM
+          files: coverage.out
+
+      # --- Upload to Coveralls ---
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: coverage.out

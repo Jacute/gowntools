@@ -84,14 +84,14 @@ func TestAnalyzeBinary(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(tt *testing.T) {
 			info, err := AnalyzeBinary(tc.path)
-			require.Equal(t, tc.expectedErr, err)
+			require.Equal(tt, tc.expectedErr, err)
 
-			require.Equal(t, tc.expectedArch, info.Arch)
-			require.Equal(t, tc.expectedOS, info.OS)
-			require.Equal(t, tc.expectedCompiler, info.Compiler)
-			require.Equal(t, tc.expectedStaticLinking, info.StaticLinking)
-			require.Equal(t, tc.expectedByteOrder, info.ByteOrder)
-			require.Equal(t, tc.expectedSecurity, info.Security)
+			require.Equal(tt, tc.expectedArch, info.Arch)
+			require.Equal(tt, tc.expectedOS, info.OS)
+			require.Equal(tt, tc.expectedCompiler, info.Compiler)
+			require.Equal(tt, tc.expectedStaticLinking, info.StaticLinking)
+			require.Equal(tt, tc.expectedByteOrder, info.ByteOrder)
+			require.Equal(tt, tc.expectedSecurity, info.Security)
 		})
 	}
 }

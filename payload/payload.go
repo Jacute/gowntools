@@ -6,12 +6,15 @@ import (
 	"github.com/Jacute/gowntools/binary"
 )
 
-type PayloadBuilder struct {
+type Builder struct {
 	payload []byte
 }
 
-func NewPayloadBuilder() *PayloadBuilder {
-	return &PayloadBuilder{
+// NewBuilder returns a new Builder that can be used to build a payload.
+// The Builder is initially empty, and you can use the various methods to
+// fill the payload with different values.
+func NewBuilder() *Builder {
+	return &Builder{
 		payload: make([]byte, 0),
 	}
 }
@@ -20,38 +23,51 @@ func NewPayloadBuilder() *PayloadBuilder {
 // It is used to fill the payload with a certain value.
 // For example, if you want to fill the payload with 10 bytes of value 0x00,
 // you can call pb.Fill(0x00, 10).
-func (pb *PayloadBuilder) Fill(b byte, n int) {
+func (pb *Builder) Fill(b byte, n int) {
 	pb.Append(bytes.Repeat([]byte{b}, n))
 }
 
-func (pb *PayloadBuilder) Addr64(addr binary.Addr) {
+// Addr64 appends the binary representation of addr as a little-endian
+// uint64 to the payload. The function takes an Addr as input and appends
+// the corresponding binary representation to the payload.
+func (pb *Builder) Addr64(addr binary.Addr) {
 	pb.Append(P64(addr))
 }
 
-func (pb *PayloadBuilder) Addr32(addr binary.Addr) {
+// Addr32 appends the binary representation of addr as a little-endian
+// uint32 to the payload. The function takes an Addr as input and appends
+// the corresponding binary representation to the payload.
+func (pb *Builder) Addr32(addr binary.Addr) {
 	pb.Append(P32(addr))
 }
 
-func (pb *PayloadBuilder) AppendByte(b byte) {
-	pb.payload = append(pb.payload, b)
+// AppendByte appends a single byte to the payload.
+// It takes a uint8 as input and appends the corresponding byte to the payload.
+func (pb *Builder) AppendByte(b uint8) {
+	pb.payload = append(pb.payload, byte(b))
 }
 
-func (pb *PayloadBuilder) Append(b []byte) {
+// Append appends the given byte slice to the payload.
+func (pb *Builder) Append(b []byte) {
 	pb.payload = append(pb.payload, b...)
 }
 
-func (pb *PayloadBuilder) Build() []byte {
+// Build returns the built payload.
+func (pb *Builder) Build() []byte {
 	return pb.payload
 }
 
-func (pb *PayloadBuilder) Reset() {
+// Reset resets the payload to its initial state.
+// It is used to clear the payload so that a new payload can be built.
+// The function is useful when you want to build multiple payloads using the same Builder.
+func (pb *Builder) Reset() {
 	pb.payload = make([]byte, 0)
 }
 
-func (pb *PayloadBuilder) Len() int {
+func (pb *Builder) Len() int {
 	return len(pb.payload)
 }
 
-func (pb *PayloadBuilder) Cap() int {
+func (pb *Builder) Cap() int {
 	return cap(pb.payload)
 }

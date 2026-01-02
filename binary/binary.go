@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrUnknownArch = errors.New("unknown arch")
-	ErrUnknownOS   = errors.New("unknown os")
+	ErrUnknownArch   = errors.New("unknown arch")
+	ErrUnknownOS     = errors.New("unknown os")
+	ErrUnknownBinary = errors.New("binary type is unknown")
 )
 
 type OS string
@@ -104,6 +105,16 @@ func (bi *Info) String() string {
 	return builder.String()
 }
 
+// AnalyzeBinary analyzes the given binary and returns information about it.
+//
+// The path must be a valid ELF, PE or Mach-O file. If the file is not
+// recognized, an error of type ErrUnknownBinary is returned.
+//
+// The returned Info contains information about the binary's architecture,
+// operating system, compiler, linking, and security.
+//
+// The returned error is nil if the analysis is successful, or an error
+// describing the problem if the analysis fails.
 func AnalyzeBinary(path string) (*Info, error) {
 	var info *Info
 	var openErr error
@@ -114,7 +125,7 @@ func AnalyzeBinary(path string) (*Info, error) {
 	} else if mf, err := macho.Open(path); err == nil {
 		info, openErr = scanMacho(mf)
 	} else {
-		return nil, err
+		return nil, ErrUnknownBinary
 	}
 
 	if openErr != nil {
@@ -124,6 +135,8 @@ func AnalyzeBinary(path string) (*Info, error) {
 	return info, nil
 }
 
+// GetSymbolAddr returns the address of the symbol with the given name.
+// If the symbol is not found, an error is returned.
 func (bi *Info) GetSymbolAddr(symbolName string) (Addr, error) {
 	symbol, ok := bi.symbols[symbolName]
 	if !ok {
@@ -182,7 +195,7 @@ func scanELF(f *elf.File) (info *Info, err error) {
 	info = &Info{
 		OS:        OSLinux,
 		Arch:      elfArch(f.Machine),
-		ByteOrder: f.FileHeader.ByteOrder,
+		ByteOrder: f.ByteOrder,
 		Security: &SecurityInfo{
 			RelRo: RelRoUnknown,
 		},
@@ -230,20 +243,29 @@ func scanELF(f *elf.File) (info *Info, err error) {
 }
 
 func scanPE(f *pe.File) (info *Info, err error) {
-	panic("not implemented")
+	info = &Info{
+		OS:        OSWindows,
+		Arch:      peArch(f.Machine),
+		ByteOrder: binary.LittleEndian,
+		Security: &SecurityInfo{
+			RelRo: RelRoUnknown,
+		},
+	}
+	// TODO: scan linking, compiler, security, etc
+	return info, nil
 }
 
 func scanMacho(f *macho.File) (info *Info, err error) {
-	panic("not implemented")
-}
-
-func symbolsContains(symbols []elf.Symbol, name string) bool {
-	for _, s := range symbols {
-		if s.Name == name {
-			return true
-		}
+	info = &Info{
+		OS:        OSMac,
+		Arch:      machoArch(f.Cpu),
+		ByteOrder: f.ByteOrder,
+		Security: &SecurityInfo{
+			RelRo: RelRoUnknown,
+		},
 	}
-	return false
+	// TODO: scan linking, compiler, security, etc
+	return info, nil
 }
 
 func getSection(sections []*elf.Section, name string) (*elf.Section, error) {
