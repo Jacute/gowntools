@@ -54,8 +54,17 @@ func (c *conn) Write(b []byte) (n int, err error) {
 	return c.conn.Write(b)
 }
 
+// WriteLine writes the given byte slice to the connection, appending a newline character
+// It returns an error if writing fails.
 func (c *conn) WriteLine(b []byte) error {
 	_, err := c.conn.Write(append(b, '\n'))
+	return err
+}
+
+// WriteStringLine writes the given string to the connection, appending a newline character
+// It returns an error if writing fails.
+func (c *conn) WriteStringLine(s string) error {
+	_, err := c.conn.Write(append([]byte(s), '\n'))
 	return err
 }
 
