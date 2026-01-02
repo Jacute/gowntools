@@ -41,9 +41,10 @@ func (pb *Builder) Addr32(addr binary.Addr) {
 	pb.Append(P32(addr))
 }
 
-// AppendByte appends a single byte b to the payload.
-func (pb *Builder) AppendByte(b byte) {
-	pb.payload = append(pb.payload, b)
+// AppendByte appends a single byte to the payload.
+// It takes a uint8 as input and appends the corresponding byte to the payload.
+func (pb *Builder) AppendByte(b uint8) {
+	pb.payload = append(pb.payload, byte(b))
 }
 
 // Append appends the given byte slice to the payload.
