@@ -20,6 +20,9 @@ jobs:
       - name: Install gocovmerge
         run: go install github.com/wadey/gocovmerge@latest
 
+      - name: Install deps
+        run: go mod tidy
+
       - name: Run tests
         run: make coverage
 
