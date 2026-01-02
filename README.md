@@ -10,7 +10,7 @@
 </p>
 <p align="center">
     <a href="#quick-start">Quick Start</a> •
-    <a href="#documentation">Docs</a> •
+    <a href="#documentation">Docs</a>
 </p>
 <p align="center">
     <a href="https://github.com/Jacute/gowntools/actions">
