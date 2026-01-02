@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"io"
 	"net"
+	"os"
 )
 
-// conn is a main
+// conn is a wrapper around a net.Conn
 type conn struct {
 	conn io.ReadWriteCloser
 }
@@ -123,4 +124,47 @@ func (c *conn) ReadLine() ([]byte, error) {
 	}
 	out = out[:len(out)-1]
 	return out, nil
+}
+
+// Interactive starts an interactive session with the connection.
+// It reads data from stdin and writes it to the connection, reads data from
+// the connection and writes it to stdout, and reads data from stderr and
+// writes it to the connection.
+//
+// The function is only supported for TCP and binary connections.
+//
+// Examples:
+//
+//	c := NewTCP("golang.org:http")
+//	c.Interactive()
+//
+//	c := NewBinary("path/to/binary")
+//	c.Interactive()
+func (c *conn) Interactive() {
+	tcp, ok1 := c.conn.(*net.TCPConn)
+	binary, ok2 := c.conn.(*bin)
+	if ok1 {
+		interactiveTCP(tcp)
+	} else if ok2 {
+		interactiveBin(binary)
+	} else {
+		panic("interactive mode only supported for TCP or binary")
+	}
+}
+
+func interactiveTCP(tc *net.TCPConn) {
+	go func() {
+		io.Copy(tc, os.Stdin)
+		tc.CloseWrite() // FIN
+	}()
+
+	io.Copy(os.Stdout, tc)
+}
+
+func interactiveBin(bn *bin) {
+	go io.Copy(bn.stdin, os.Stdin)
+	go io.Copy(os.Stdout, bn.stdout)
+	go io.Copy(os.Stderr, bn.stderr)
+
+	bn.cmd.Wait()
 }

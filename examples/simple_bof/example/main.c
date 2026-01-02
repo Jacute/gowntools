@@ -9,7 +9,7 @@ void init() {
 
 
 void win() {
-    system("id");
+    system("/bin/sh");
 }
 
 void main() {

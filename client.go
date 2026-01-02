@@ -13,4 +13,6 @@ type Client interface {
 	ReadLine() (out []byte, err error)
 
 	WriteLine(b []byte) error
+
+	Interactive()
 }
