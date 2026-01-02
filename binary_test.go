@@ -13,4 +13,7 @@ func TestExploitBinary(t *testing.T) {
 	ln, err := bn.ReadLine()
 	require.NoError(t, err)
 	require.Equal(t, "hello!", string(ln))
+
+	err = bn.WriteStringLine("aboba")
+	require.NoError(t, err)
 }
