@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ master, dev ]
 
+timeout-minutes: 2
+
 jobs:
   lint:
     runs-on: ubuntu-latest
