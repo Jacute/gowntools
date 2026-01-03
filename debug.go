@@ -24,8 +24,9 @@ var (
 )
 
 type debugger struct {
-	term      terminal
-	attachPid int
+	gdbCommands []string
+	term        terminal
+	attachPid   int
 }
 
 type option func(*debugger)
@@ -82,6 +83,12 @@ func WithTerminal(term terminal) func(*debugger) {
 	}
 }
 
+func WithGDBScript(script string) func(*debugger) {
+	return func(client *debugger) {
+		client.gdbCommands = strings.Split(script, "\n")
+	}
+}
+
 func getTerminal() ([]string, error) {
 	gnomeEnv := os.Getenv("GNOME_TERMINAL_SCREEN")
 	if gnomeEnv != "" {
@@ -102,9 +109,13 @@ func (d *debugger) Start(term terminal) error {
 	gdbCmd := []string{
 		"gdb",
 		"-q",
-		"-p",
-		fmt.Sprintf("%d", d.attachPid),
 	}
+	if len(d.gdbCommands) != 0 {
+		for _, cmd := range d.gdbCommands {
+			gdbCmd = append(gdbCmd, "-ex", cmd)
+		}
+	}
+	gdbCmd = append(gdbCmd, "-p", fmt.Sprintf("%d", d.attachPid))
 
 	args := append(d.term[1:], gdbCmd...)
 	cmd := exec.Command(d.term[0], args...)
