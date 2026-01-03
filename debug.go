@@ -66,7 +66,7 @@ func Debug(client Client, opts ...option) error {
 		dbg.term = terminal
 	}
 
-	err := dbg.Start(dbg.term)
+	err := dbg.start()
 	if err != nil {
 		return err
 	}
@@ -83,6 +83,17 @@ func WithTerminal(term terminal) func(*debugger) {
 	}
 }
 
+// WithGDBScript returns an option that sets the commands to be executed
+// by gdb when attaching to the process. The commands are split by newline
+// characters, so the following is a valid command string:
+//
+//	break main\n
+//	info registers\n
+//	continue\n
+//
+// The function can be used to set arbitrary commands to be executed by
+// gdb when attaching to the process. The commands are executed in the order
+// they are given in the string.
 func WithGDBScript(script string) func(*debugger) {
 	return func(client *debugger) {
 		client.gdbCommands = strings.Split(script, "\n")
@@ -105,7 +116,7 @@ func getTerminal() ([]string, error) {
 	return nil, ErrTerminalNotFound
 }
 
-func (d *debugger) Start(term terminal) error {
+func (d *debugger) start() error {
 	gdbCmd := []string{
 		"gdb",
 		"-q",
