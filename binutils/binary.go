@@ -1,4 +1,4 @@
-package binary
+package binutils
 
 import (
 	"debug/elf"
@@ -30,18 +30,21 @@ func (o *OS) String() string {
 	return string(*o)
 }
 
-type Arch string
+type Arch struct {
+	Name    string
+	Bitness uint8
+}
 
 var (
-	ArchAmd64   Arch = "amd64"
-	ArchI386    Arch = "i386"
-	ArchArm64   Arch = "arm64"
-	ArchArm32   Arch = "arm"
-	ArchUnknown Arch = "Unknown"
+	ArchAmd64   = Arch{Name: "amd64", Bitness: 64}
+	ArchI386    = Arch{Name: "i386", Bitness: 32}
+	ArchArm64   = Arch{Name: "arm64", Bitness: 64}
+	ArchArm32   = Arch{Name: "arm", Bitness: 32}
+	ArchUnknown = Arch{Name: "unknown"}
 )
 
 func (a *Arch) String() string {
-	return string(*a)
+	return a.Name
 }
 
 type Addr uint64

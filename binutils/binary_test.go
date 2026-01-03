@@ -1,4 +1,4 @@
-package binary
+package binutils
 
 import (
 	"encoding/binary"

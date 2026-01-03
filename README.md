@@ -26,6 +26,8 @@
 
 ## Quick start
 
+> ⚠️ **Now library supports only amd64 CPU architecture**
+
 1. Install library
 
 `go get github.com/Jacute/gowntools`
