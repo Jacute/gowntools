@@ -2,6 +2,7 @@ package payload
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 
 	"encoding/binary"
@@ -10,6 +11,8 @@ import (
 )
 
 var (
+	ErrPayloadBiggerThenPaddingLength = errors.New("payload bigger then padding length")
+
 	fmtReadRdiBytes = []byte{'%', '1', '$', 'p'}
 	fmtReadRsiBytes = []byte{'%', '2', '$', 'p'}
 	fmtReadRdxBytes = []byte{'%', '3', '$', 'p'}
@@ -52,11 +55,12 @@ func (pb *Builder) Fill(b byte, n int) {
 	pb.Append(bytes.Repeat([]byte{b}, n))
 }
 
-func (pb *Builder) PadTo(b byte, n int) {
+func (pb *Builder) PadTo(b byte, n int) error {
 	if pb.Len() > n {
-		return // TODO: return error
+		return ErrPayloadBiggerThenPaddingLength
 	}
 	pb.Fill(b, n-pb.Len())
+	return nil
 }
 
 func (pb *Builder) Addr(addr binutils.Addr) {
