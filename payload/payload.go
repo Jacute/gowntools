@@ -55,6 +55,11 @@ func (pb *Builder) Fill(b byte, n int) {
 	pb.Append(bytes.Repeat([]byte{b}, n))
 }
 
+// PadTo pads the payload with byte b until it reaches a length of n.
+// If the payload is already bigger than n, it returns an error.
+// It is used to pad the payload with a certain value until it reaches a certain length.
+// For example, if you want to pad the payload with 0x00 until it reaches a length of 64,
+// you can call pb.PadTo(0x00, 64).
 func (pb *Builder) PadTo(b byte, n int) error {
 	if pb.Len() > n {
 		return ErrPayloadBiggerThenPaddingLength
@@ -63,6 +68,23 @@ func (pb *Builder) PadTo(b byte, n int) error {
 	return nil
 }
 
+// Addr appends the binutils representation of addr to the payload.
+// The function uses the configured CPU architecture and byte order to encode
+// the address.
+//
+// The function is used to encode addresses in payload messages.
+//
+// Example:
+//
+//	b := payload.NewBuilder(binutils.ArchAmd64, binary.LittleEndian)
+//	b.Addr(0xdeadbeef)
+//
+// The function appends the following byte sequences to the payload:
+//
+//   - For 64-bit architectures, 8 bytes (uint64 in little-endian byte order)
+//   - For 32-bit architectures, 4 bytes (uint32 in little-endian byte order)
+//   - For 16-bit architectures, 2 bytes (uint16 in little-endian byte order)
+//   - For 8-bit architectures, 1 byte (uint8 in little-endian byte order)
 func (pb *Builder) Addr(addr binutils.Addr) {
 	switch pb.arch.Bitness {
 	case 64:
