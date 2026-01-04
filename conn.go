@@ -134,6 +134,21 @@ func (c *conn) ReadLine() ([]byte, error) {
 	return out, nil
 }
 
+// ReadStringLine reads a line of data from the connection and returns it as a string.
+// It returns an error if reading fails.
+//
+// Examples:
+//
+//	c := NewTCP("golang.org:http")
+//	s, err := c.ReadStringLine()
+//
+//	c := NewBinary("path/to/binary")
+//	s, err := c.ReadStringLine()
+func (c *conn) ReadStringLine() (string, error) {
+	out, err := c.ReadLine()
+	return string(out), err
+}
+
 // Interactive starts an interactive session with the connection.
 // It reads data from stdin and writes it to the connection, reads data from
 // the connection and writes it to stdout, and reads data from stderr and

@@ -52,6 +52,13 @@ func (pb *Builder) Fill(b byte, n int) {
 	pb.Append(bytes.Repeat([]byte{b}, n))
 }
 
+func (pb *Builder) PadTo(b byte, n int) {
+	if pb.Len() > n {
+		return // TODO: return error
+	}
+	pb.Fill(b, n-pb.Len())
+}
+
 func (pb *Builder) Addr(addr binutils.Addr) {
 	switch pb.arch.Bitness {
 	case 64:
@@ -126,6 +133,7 @@ func (pb *Builder) FmtReadRegister(register string) {
 	default:
 		panic("Unknown register")
 	}
+	pb.AppendByte(pb.fmtDelimiter)
 }
 
 // FmtReadStack appends parts of a payload that use a format string vulnerability
@@ -158,17 +166,26 @@ func (pb *Builder) FmtReadStack(stackAddr binutils.Addr, leakAddresses ...binuti
 	for _, leakAddr := range leakAddresses {
 		offset := leakAddr - stackAddr
 		number := uint64(offset) / uint64(pb.arch.Bitness/8)
-		number -= 6 // delete the first 6 arguments for amd64 calling convention
+		number += 6 // add to number the first 6 arguments for amd64 calling convention
 
 		pb.AppendByte('%')
 		pb.payload = strconv.AppendUint(pb.payload, number, 10)
 		pb.Append([]byte{'$', 'p'})
+		pb.AppendByte(pb.fmtDelimiter)
 	}
 }
 
 // Build returns the built payload.
 func (pb *Builder) Build() []byte {
 	return pb.payload
+}
+
+// Delimiter returns the delimiter byte used in format string specifiers.
+//
+// The delimiter is used to separate format specifiers from the payload.
+// By default, the delimiter is '-' (hyphen).
+func (pb *Builder) Delimiter() byte {
+	return pb.fmtDelimiter
 }
 
 // Reset resets the payload to its initial state.

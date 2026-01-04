@@ -1,6 +1,7 @@
 package binutils
 
 import (
+	"bytes"
 	"debug/elf"
 	"debug/macho"
 	"debug/pe"
@@ -8,13 +9,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
 var (
-	ErrUnknownArch   = errors.New("unknown arch")
-	ErrUnknownOS     = errors.New("unknown os")
-	ErrUnknownBinary = errors.New("binary type is unknown")
+	ErrUnknownArch    = errors.New("unknown arch")
+	ErrUnknownOS      = errors.New("unknown os")
+	ErrUnknownBinary  = errors.New("binary type is unknown")
+	ErrStringNotFound = errors.New("string not found")
 )
 
 type OS string
@@ -54,7 +57,8 @@ func (a Addr) String() string {
 }
 
 type Info struct {
-	symbols map[string]*elf.Symbol
+	symbols      map[string]*elf.Symbol
+	dataSections []*elf.Section
 
 	Arch          Arch
 	OS            OS
@@ -119,6 +123,10 @@ func (bi *Info) String() string {
 // The returned error is nil if the analysis is successful, or an error
 // describing the problem if the analysis fails.
 func AnalyzeBinary(path string) (*Info, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, err
+	}
+
 	var info *Info
 	var openErr error
 	if ef, err := elf.Open(path); err == nil {
@@ -147,6 +155,23 @@ func (bi *Info) GetSymbolAddr(symbolName string) (Addr, error) {
 	}
 
 	return Addr(symbol.Value), nil
+}
+
+// GetStringAddr returns the address of the given string in the binary's .data or .rodata
+// sections. If the string is not found, an error of type ErrStringNotFound
+// is returned.
+func (bi *Info) GetStringAddr(s string) (Addr, error) {
+	for _, sec := range bi.dataSections {
+		addr, err := findStringInSection(sec, s)
+		if err != nil {
+			if err == ErrStringNotFound {
+				continue
+			}
+			return 0, err
+		}
+		return addr, nil
+	}
+	return 0, ErrStringNotFound
 }
 
 func elfArch(m elf.Machine) Arch {
@@ -225,6 +250,7 @@ func scanELF(f *elf.File) (info *Info, err error) {
 	if dynamic == nil && err != nil {
 		info.StaticLinking = true
 	}
+	info.dataSections = getDataSections(f.Sections)
 
 	symbols, err := loadELFSymbols(f, info.StaticLinking)
 	if err != nil {
@@ -284,13 +310,8 @@ func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, er
 	symbols := make(map[string]*elf.Symbol)
 
 	var syms []elf.Symbol
-	var err error
 
-	syms, err = f.Symbols()
-	if err != nil {
-		return nil, err
-	}
-
+	syms, _ = f.Symbols() // skip error if symbols not found
 	if !staticLinking {
 		dynSyms, err := f.DynamicSymbols()
 		if err != nil {
@@ -300,8 +321,38 @@ func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, er
 	}
 
 	for i := range syms {
-		symbols[syms[i].Name] = &syms[i]
+		s := syms[i]
+		symbols[syms[i].Name] = &s
 	}
 
 	return symbols, nil
+}
+
+func getDataSections(sections []*elf.Section) []*elf.Section {
+	dataSections := make([]*elf.Section, 0)
+	for _, sec := range sections {
+		if sec.Name == ".data" || sec.Name == ".rodata" {
+			dataSections = append(dataSections, sec)
+		}
+	}
+
+	return dataSections
+}
+
+func findStringInSection(section *elf.Section, str string) (Addr, error) {
+	data, err := section.Data()
+	if err != nil {
+		return 0, err
+	}
+
+	stringBytes := append([]byte(str), '\x00')
+	for i := range data {
+		if bytes.Equal(data[i:i+len(stringBytes)], stringBytes) {
+			addr := Addr(section.Addr + uint64(i))
+			return addr, nil
+		}
+	}
+
+	var nilAddr Addr
+	return nilAddr, ErrStringNotFound
 }

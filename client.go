@@ -11,6 +11,7 @@ type Client interface {
 	ReadAll() (out []byte, n int, err error)
 	ReadUntil(data []byte) (out []byte, err error)
 	ReadLine() (out []byte, err error)
+	ReadStringLine() (string, error)
 
 	WriteLine(b []byte) error
 	WriteStringLine(s string) error
