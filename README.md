@@ -24,9 +24,14 @@
     </a>
 </p>
 
-## Quick start
+## Dependencies
 
-> ⚠️ **Now library supports only amd64 CPU architecture**
+For use debug functions:
+
+- gdb
+- terminal like tmux, xterm or gnome-terminal
+
+## Quick start
 
 1. Install library
 
@@ -35,5 +40,7 @@
 2. Check [examples](./examples/)
 
 ## Documentation
+
+> ⚠️ **Now library supports only amd64 CPU architecture**
 
 https://pkg.go.dev/github.com/Jacute/gowntools
