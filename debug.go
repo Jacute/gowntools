@@ -32,21 +32,23 @@ type debugger struct {
 type option func(*debugger)
 
 // Debug starts a gdb debugging session for the given client.
-// It returns an error if the client is not a *conn or if the underlying
-// process is not a *bin. The function also returns an error if it can't spawn
-// a terminal to attach to the process or if the process hasn't attached to
-// gdb after the given timeout.
-//
-// The function try to use terminals of different types (tmux, xterm, gnome-terminal)
-func Debug(client Client, opts ...option) error {
+// It panics if the client is not a *conn or if the underlying
+// process is not a *bin.
+// The function requires gdb installed and terminal (tmux, xterm or gnome-terminal).
+// Otherwise, the function will panic.
+func Debug(client Client, opts ...option) {
+	if err := checkGDBInPATH(); err != nil {
+		panic(err)
+	}
+
 	// get bin from interface Client
 	conn, ok := client.(*conn)
 	if !ok {
-		return errIncorrectClient
+		panic(errIncorrectClient)
 	}
 	bin, ok := conn.conn.(*bin)
 	if !ok {
-		return errIncorrectClient
+		panic(errIncorrectClient)
 	}
 
 	// init debugger
@@ -61,17 +63,15 @@ func Debug(client Client, opts ...option) error {
 	if dbg.term == nil {
 		terminal, err := getTerminal()
 		if err != nil {
-			return fmt.Errorf("can't get terminal for spawn gdb")
+			panic(err)
 		}
 		dbg.term = terminal
 	}
 
 	err := dbg.start()
 	if err != nil {
-		return err
+		panic(err)
 	}
-
-	return nil
 }
 
 // WithTerminal returns an option that sets the terminal to use when spawning
@@ -162,4 +162,11 @@ func (d *debugger) waitForAttach(timeout time.Duration) error {
 	}
 
 	return fmt.Errorf("timeout waiting for gdb attach")
+}
+
+func checkGDBInPATH() error {
+	if _, err := exec.LookPath("gdb"); err != nil {
+		return fmt.Errorf("gdb not found in PATH: %w", err)
+	}
+	return nil
 }
