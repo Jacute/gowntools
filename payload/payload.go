@@ -184,12 +184,12 @@ func (pb *Builder) FmtReadRegister(register string) {
 //   - amd64
 //
 // The function panics if called on an unsupported architecture.
-func (pb *Builder) FmtReadStack(stackAddr binutils.Addr, leakAddresses ...binutils.Addr) {
+func (pb *Builder) FmtReadStack(stackAddr binutils.Addr, leakAddrs ...binutils.Addr) {
 	if pb.arch != binutils.ArchAmd64 && pb.arch != binutils.ArchI386 {
 		panic("FmtReadStack supports only i386 and amd64 architectures")
 	}
 
-	for _, leakAddr := range leakAddresses {
+	for _, leakAddr := range leakAddrs {
 		offset := leakAddr - stackAddr
 		number := uint64(offset) / uint64(pb.arch.Bitness/8)
 		number += 6 // add to number the first 6 arguments for amd64 calling convention
