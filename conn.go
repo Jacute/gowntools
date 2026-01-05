@@ -2,9 +2,15 @@ package pwn
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net"
 	"os"
+	"sync"
+)
+
+var (
+	ErrInteractiveModeNotSupported = errors.New("interactive mode only supported for TCP or binary")
 )
 
 // conn is a wrapper around a net.Conn
@@ -150,47 +156,104 @@ func (c *conn) ReadStringLine() (string, error) {
 }
 
 // Interactive starts an interactive session with the connection.
-// It reads data from stdin and writes it to the connection, reads data from
-// the connection and writes it to stdout, and reads data from stderr and
-// writes it to the connection.
 //
-// The function is only supported for TCP and binary connections.
+// It forwards data between stdin/stdout and the underlying connection:
+//
+//   - stdin  → connection
+//   - connection stdout → stdout
+//   - connection stderr → stdout
+//
+// The function blocks until the connection is closed or the underlying
+// process exits.
+//
+// Interactive mode is only supported for TCP and binary connections.
+// If the underlying connection type does not support interactive mode,
+// the function panics.
+//
+// Panics:
+//   - if interactive mode is not supported for the connection type
+//   - if an I/O error occurs during the interactive session
 //
 // Examples:
 //
-//	c := NewTCP("golang.org:http")
+//	c := NewTCP("golang.org:80")
 //	c.Interactive()
 //
 //	c := NewBinary("path/to/binary")
 //	c.Interactive()
 func (c *conn) Interactive() {
-	interactiveIO(c, os.Stdin, os.Stdout)
-}
-
-func interactiveIO(conn *conn, r io.Reader, w io.Writer) {
-	tcp, ok1 := conn.conn.(*net.TCPConn)
-	binary, ok2 := conn.conn.(*bin)
-	if ok1 {
-		interactiveTCP(tcp, r, w)
-	} else if ok2 {
-		interactiveBin(binary, r, w)
-	} else {
-		panic("interactive mode only supported for TCP or binary")
+	err := interactiveIO(c, os.Stdin, os.Stdout)
+	if err != nil {
+		panic(err)
 	}
 }
 
-func interactiveTCP(tc *net.TCPConn, r io.Reader, w io.Writer) {
-	go func() {
-		io.Copy(tc, r)
-		tc.CloseWrite() // FIN
-	}()
-
-	io.Copy(w, tc)
+func interactiveIO(conn *conn, r io.Reader, w io.Writer) error {
+	switch v := conn.conn.(type) {
+	case *net.TCPConn:
+		return interactiveTCP(v, r, w)
+	case *bin:
+		return interactiveBin(v, r, w)
+	default:
+		return ErrInteractiveModeNotSupported
+	}
 }
 
-func interactiveBin(bn *bin, r io.Reader, w io.Writer) {
-	go io.Copy(bn.stdin, r)
-	go io.Copy(w, io.MultiReader(bn.stdout, bn.stderr))
+func interactiveTCP(tc *net.TCPConn, r io.Reader, w io.Writer) error {
+	var wg sync.WaitGroup
+	var writeErr, readErr error
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, writeErr = io.Copy(tc, r)
+		_ = tc.CloseWrite()
+	}()
+	go func() {
+		defer wg.Done()
+		_, readErr = io.Copy(w, tc)
+	}()
+	wg.Wait()
 
-	bn.cmd.Wait()
+	if writeErr != nil {
+		return writeErr
+	}
+	return readErr
+}
+
+func interactiveBin(bn *bin, r io.Reader, w io.Writer) error {
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	var writeErr, outErr, errStreamErr error
+
+	go func() {
+		defer wg.Done()
+		_, writeErr = io.Copy(bn.stdin, r)
+		_ = bn.stdin.Close()
+	}()
+
+	go func() {
+		defer wg.Done()
+		_, outErr = io.Copy(w, bn.stdout)
+	}()
+
+	go func() {
+		defer wg.Done()
+		_, errStreamErr = io.Copy(w, bn.stderr)
+	}()
+
+	cmdErr := bn.cmd.Wait()
+	wg.Wait()
+
+	if writeErr != nil {
+		return writeErr
+	}
+	if outErr != nil {
+		return outErr
+	}
+	if errStreamErr != nil {
+		return errStreamErr
+	}
+
+	return cmdErr
 }
