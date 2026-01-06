@@ -66,7 +66,7 @@ func TestReadFirstInstructionsI386(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(tt *testing.T) {
-			b := readFirstInstructionsI386(tc.code, tc.bitness, tc.n)
+			b := readFirstInstructionsX86(tc.code, tc.bitness, tc.n)
 			for i := range b {
 				require.Equal(tt, tc.expectedInstructions[i], b[i].String())
 			}

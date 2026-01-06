@@ -181,7 +181,7 @@ func findStringInELFSection(section *elf.Section, str string) (Addr, error) {
 	return nilAddr, ErrStringNotFound
 }
 
-func readFirstInstructionsI386(code []byte, bitness int, n int) []x86asm.Inst {
+func readFirstInstructionsX86(code []byte, bitness int, n int) []x86asm.Inst {
 	insts := make([]x86asm.Inst, 0, n)
 
 	offset := 0

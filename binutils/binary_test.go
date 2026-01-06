@@ -2,7 +2,6 @@ package binutils
 
 import (
 	"encoding/binary"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -131,20 +130,20 @@ func TestGetGadgetAddr(t *testing.T) {
 	testcases := []struct {
 		name         string
 		libcPath     string
-		gadget       []byte
+		gadget       []string
 		expectedAddr Addr
 		expectedErr  error
 	}{
 		{
 			name:         "pop rdi ; ret",
 			libcPath:     "./testdata/libc/libc.so.6",
-			gadget:       []byte{0x5f, 0xc3},
+			gadget:       []string{"pop rdi", "ret"},
 			expectedAddr: Addr(0x000000000002a145),
 		},
 		{
 			name:        "not found",
 			libcPath:    "./testdata/libc/libc.so.6",
-			gadget:      []byte{0x12, 0x34, 0x56, 0x78},
+			gadget:      []string{"pop rdi"},
 			expectedErr: ErrGadgetNotFound,
 		},
 	}
@@ -158,7 +157,6 @@ func TestGetGadgetAddr(t *testing.T) {
 			addrs, err := binInfo.GetGadgetAddr(tc.gadget)
 			require.ErrorIs(tt, tc.expectedErr, err)
 
-			fmt.Println(addrs)
 			if tc.expectedErr == nil {
 				require.Contains(tt, addrs, tc.expectedAddr)
 			}

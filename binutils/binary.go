@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/arch/x86/x86asm"
@@ -196,12 +198,17 @@ func (bi *Binary) GetStringAddr(s string) (Addr, error) {
 	return 0, ErrStringNotFound
 }
 
-func (bi *Binary) GetGadgetAddr(gadget []byte) ([]Addr, error) {
+func (bi *Binary) GetGadgetAddr(gadget []string) ([]Addr, error) {
 	if bi.OS != OSLinux {
 		return nil, fmt.Errorf("GetGadgetAddr supports only ELF binaries")
 	}
 
-	instSlice := readFirstInstructionsI386(gadget, int(bi.Arch.Bitness), maxGadgetLen)
+	gadgetBytes, err := assembleX86(gadget)
+	if err != nil {
+		return nil, err
+	}
+
+	instSlice := readFirstInstructionsX86(gadgetBytes, int(bi.Arch.Bitness), maxGadgetLen)
 	var instArr [maxGadgetLen]x86asm.Inst
 	copy(instArr[:], instSlice)
 
@@ -289,4 +296,28 @@ func scanMacho(f *macho.File) (info *Binary, err error) {
 	}
 	// TODO: scan linking, compiler, security, etc
 	return info, nil
+}
+
+func assembleX86(code []string) ([]byte, error) {
+	src := "BITS 64\n" + strings.Join(code, "\n") + "\n"
+
+	dir, err := os.MkdirTemp("", "asm")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+
+	asmPath := filepath.Join(dir, "code.asm")
+	binPath := filepath.Join(dir, "code.bin")
+
+	if err := os.WriteFile(asmPath, []byte(src), 0644); err != nil {
+		return nil, err
+	}
+
+	cmd := exec.Command("nasm", "-f", "bin", asmPath, "-o", binPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("nasm error: %v\n%s", err, out)
+	}
+
+	return os.ReadFile(binPath)
 }

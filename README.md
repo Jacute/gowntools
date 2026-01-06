@@ -31,6 +31,10 @@ For use debug functions:
 - gdb
 - terminal like tmux, xterm or gnome-terminal
 
+For finding gadgets (binutils.GetGadgetAddr):
+
+- nasm
+
 ## Quick start
 
 1. Install library
