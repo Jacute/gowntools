@@ -3,6 +3,7 @@ package binutils
 import (
 	"bytes"
 	"debug/elf"
+	"errors"
 	"fmt"
 	"io"
 
@@ -47,6 +48,9 @@ func (bi *elfBinary) GetStringAddr(s string) (Addr, error) {
 func (bi *elfBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
 	gadgetBytes, err := assembleX86(instructions)
 	if err != nil {
+		if errors.Is(err, ErrNasmNotFoundInPATH) {
+			panic(err)
+		}
 		return nil, err
 	}
 

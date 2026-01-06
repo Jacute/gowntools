@@ -10,7 +10,15 @@ import (
 	"golang.org/x/arch/x86/x86asm"
 )
 
+var (
+	ErrNasmNotFoundInPATH = fmt.Errorf("nasm not found in PATH")
+)
+
 func assembleX86(instructions []string) ([]byte, error) {
+	if _, err := exec.LookPath("nasm"); err != nil {
+		return nil, ErrNasmNotFoundInPATH
+	}
+
 	src := "BITS 64\n" + strings.Join(instructions, "\n") + "\n"
 
 	dir, err := os.MkdirTemp("", "asm")

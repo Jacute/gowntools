@@ -37,8 +37,8 @@ type option func(*debugger)
 // The function requires gdb installed and terminal (tmux, xterm or gnome-terminal).
 // Otherwise, the function will panic.
 func Debug(client Client, opts ...option) {
-	if err := checkGDBInPATH(); err != nil {
-		panic(err)
+	if _, err := exec.LookPath("gdb"); err != nil {
+		panic("gdb not found in PATH")
 	}
 
 	// get bin from interface Client
@@ -162,11 +162,4 @@ func (d *debugger) waitForAttach(timeout time.Duration) error {
 	}
 
 	return fmt.Errorf("timeout waiting for gdb attach")
-}
-
-func checkGDBInPATH() error {
-	if _, err := exec.LookPath("gdb"); err != nil {
-		return fmt.Errorf("gdb not found in PATH: %w", err)
-	}
-	return nil
 }

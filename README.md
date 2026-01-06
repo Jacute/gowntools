@@ -31,7 +31,7 @@ For use debug functions:
 - gdb
 - terminal like tmux, xterm or gnome-terminal
 
-For finding gadgets (binutils.GetGadgetAddr):
+For finding gadgets:
 
 - nasm
 
