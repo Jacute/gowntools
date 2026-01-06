@@ -1,24 +1,31 @@
-/*
-Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
 	"fmt"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	Module  = "unknown_module"
-	Version = "dev"
+	Version, Module string
 )
+
+func init() {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		Module = info.Main.Path
+		Version = info.Main.Version
+	} else {
+		panic("error: no build info")
+	}
+}
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "print version of gowntools",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(Version)
+		fmt.Println("version:", Version)
+		fmt.Println("module:", Module)
 	},
 }
 
