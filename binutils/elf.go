@@ -65,10 +65,6 @@ func (bi *elfBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
 	return addrs, nil
 }
 
-func (bi *elfBinary) PrintGadgets() {
-	fmt.Println(bi.gadgets)
-}
-
 func scanELF(f *elf.File) (Binary, error) {
 	bin := &elfBinary{
 		info: &binaryInfo{

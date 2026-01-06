@@ -19,7 +19,7 @@ var infoCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Println(binInfo)
+		fmt.Println(binInfo.Info())
 		return nil
 	},
 }

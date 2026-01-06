@@ -22,7 +22,7 @@ const (
 func (r RelRo) String() string {
 	switch r {
 	case RelRoEnable:
-		return "enable"
+		return "full"
 	case RelRoPartial:
 		return "partial"
 	case RelRoDisable:

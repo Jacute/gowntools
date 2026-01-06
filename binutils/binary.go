@@ -83,24 +83,27 @@ func (bi *binaryInfo) String() string {
 
 	builder.WriteString("=== BINARY INFO ===\n")
 
-	builder.WriteString("arch: ")
+	builder.WriteString("Arch: ")
 	builder.WriteString(bi.Arch.String())
 	builder.WriteByte('\n')
 
-	builder.WriteString("os: ")
+	builder.WriteString("OS: ")
 	builder.WriteString(bi.OS.String())
 	builder.WriteByte('\n')
 
-	builder.WriteString("compiler: ")
+	builder.WriteString("Compiler: ")
 	builder.WriteString(bi.Compiler)
 	builder.WriteByte('\n')
 
-	builder.WriteString("linking: ")
+	builder.WriteString("Linking: ")
 	if bi.StaticLinking {
 		builder.WriteString("static\n")
 	} else {
 		builder.WriteString("dynamic\n")
 	}
+	builder.WriteString("Byte Order: ")
+	builder.WriteString(bi.ByteOrder.String())
+	builder.WriteByte('\n')
 
 	builder.WriteString("=== SECURITY ===\n")
 	if bi.Security == nil {
@@ -108,13 +111,27 @@ func (bi *binaryInfo) String() string {
 		return builder.String()
 	}
 
-	builder.WriteString("relro: ")
+	builder.WriteString("RELRO: ")
 	builder.WriteString(bi.Security.RelRo.String())
 	builder.WriteByte('\n')
 
-	fmt.Fprintf(&builder, "canary: %t\n", bi.Security.CanaryEnable)
-	fmt.Fprintf(&builder, "pie: %t\n", bi.Security.PIEEnable)
-	fmt.Fprintf(&builder, "nx: %t\n", bi.Security.NXEnable)
+	if bi.Security.CanaryEnable {
+		builder.WriteString("Canary: yes\n")
+	} else {
+		builder.WriteString("Canary: no\n")
+	}
+
+	if bi.Security.PIEEnable {
+		builder.WriteString("PIE: yes\n")
+	} else {
+		builder.WriteString("PIE: no\n")
+	}
+
+	if bi.Security.NXEnable {
+		builder.WriteString("NX: yes\n")
+	} else {
+		builder.WriteString("NX: no")
+	}
 
 	return builder.String()
 }

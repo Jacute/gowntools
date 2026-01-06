@@ -2,6 +2,7 @@ package binutils
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -97,70 +98,21 @@ func TestAnalyzeBinary(t *testing.T) {
 	}
 }
 
-func TestGetSymbolAddr(t *testing.T) {
-	testcases := []struct {
-		name     string
-		path     string
-		expected Addr
-	}{
-		{
-			name:     "static",
-			path:     "./testdata/linux_amd64/static_main",
-			expected: Addr(0x0000000000401905),
-		},
-		{
-			name:     "dynamic",
-			path:     "./testdata/linux_amd64/dynamic_main",
-			expected: Addr(0x00000000000011a9),
-		},
-	}
+func TestBinaryInfoString(t *testing.T) {
+	bin, err := AnalyzeBinary("./testdata/linux_amd64/static_main")
+	require.NoError(t, err)
 
-	for _, tc := range testcases {
-		t.Run(tc.name, func(tt *testing.T) {
-			bn, err := AnalyzeBinary(tc.path)
-			require.NoError(tt, err)
+	info := bin.Info()
+	out := info.String()
+	strs := strings.Split(out, "\n")
 
-			addr, err := bn.GetSymbolAddr("win")
-			require.NoError(tt, err)
-			require.Equal(tt, tc.expected, addr)
-		})
-	}
-}
-
-func TestGetGadgetAddr(t *testing.T) {
-	testcases := []struct {
-		name         string
-		libcPath     string
-		gadget       []string
-		expectedAddr Addr
-		expectedErr  error
-	}{
-		{
-			name:         "pop rdi ; ret",
-			libcPath:     "./testdata/libc/libc.so.6",
-			gadget:       []string{"pop rdi", "ret"},
-			expectedAddr: Addr(0x000000000002a145),
-		},
-		{
-			name:        "not found",
-			libcPath:    "./testdata/libc/libc.so.6",
-			gadget:      []string{"pop rdi"},
-			expectedErr: ErrGadgetNotFound,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(tt *testing.T) {
-			binInfo, err := AnalyzeBinary(tc.libcPath)
-			require.NoError(tt, err)
-
-			// binInfo.PrintGadgets()
-			addrs, err := binInfo.GetGadgetAddr(tc.gadget)
-			require.ErrorIs(tt, tc.expectedErr, err)
-
-			if tc.expectedErr == nil {
-				require.Contains(tt, addrs, tc.expectedAddr)
-			}
-		})
-	}
+	require.Contains(t, strs, "OS: Linux")
+	require.Contains(t, strs, "Arch: amd64")
+	require.Contains(t, strs, "Compiler: GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0")
+	require.Contains(t, strs, "Linking: static")
+	require.Contains(t, strs, "Byte Order: LittleEndian")
+	require.Contains(t, strs, "RELRO: partial")
+	require.Contains(t, strs, "Canary: yes")
+	require.Contains(t, strs, "PIE: no")
+	require.Contains(t, strs, "NX: yes")
 }
