@@ -8,7 +8,8 @@ import (
 )
 
 var (
-	Version, Module string
+	Version = "dev"
+	Module  = "unknown_module"
 )
 
 func init() {
@@ -25,7 +26,7 @@ var versionCmd = &cobra.Command{
 	Short: "print version of gowntools",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("version:", Version)
-		fmt.Println("module:", Module)
+		fmt.Println("library module:", Module)
 	},
 }
 

@@ -39,7 +39,7 @@ For finding gadgets:
 
 1. Install library
 
-`go get github.com/Jacute/gowntools`
+`go get github.com/Jacute/gowntools@latest`
 
 2. Install cli tool
 

@@ -4,14 +4,20 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
-	"text/template"
 
+	"github.com/Jacute/gowntools/cmd/gowncli/internal/tmpl"
 	"github.com/spf13/cobra"
+)
+
+var (
+	templates = []string{
+		"templates/main.go.tmpl",
+		"templates/go.mod.tmpl",
+	}
 )
 
 //go:embed templates/*
@@ -31,16 +37,6 @@ var (
 	nameBlacklist          = "/\\:*!?\"<>| "
 )
 
-type templateParams struct {
-	Module      string
-	ProjectName string
-	Version     string
-	BinPath     string
-	Host        string
-	Port        uint16
-	IsRemote    bool
-}
-
 // templateCmd represents the template command
 var templateCmd = &cobra.Command{
 	Use:   "template",
@@ -48,10 +44,10 @@ var templateCmd = &cobra.Command{
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		return validateTargetFlags()
 	},
-	RunE: tmpl,
+	RunE: genTemplate,
 }
 
-func tmpl(cmd *cobra.Command, args []string) error {
+func genTemplate(cmd *cobra.Command, args []string) error {
 	if err := validateName(name); err != nil {
 		return err
 	}
@@ -62,21 +58,12 @@ func tmpl(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Generating exploit template...")
 
+	// make out dir
 	err = os.Mkdir(name, 0744)
 	if err != nil && os.IsNotExist(err) {
 		return err
 	}
-
-	mainFile, err := templatesFS.Open("templates/main.go.tmpl")
-	if err != nil {
-		return err
-	}
-	defer mainFile.Close()
-	modFile, err := templatesFS.Open("templates/go.mod.tmpl")
-	if err != nil {
-		return err
-	}
-	defer modFile.Close()
+	// open files
 	resultMainFile, err := os.Create(fmt.Sprintf("%s/main.go", name))
 	if err != nil {
 		return err
@@ -88,11 +75,26 @@ func tmpl(cmd *cobra.Command, args []string) error {
 	}
 	defer resultModFile.Close()
 
-	err = execTmpl(mainFile, resultMainFile)
+	// prepare params
+	params := tmpl.TemplateParams{
+		Module:      Module,
+		ProjectName: name,
+		Version:     Version,
+		BinPath:     path.Join(curDir, name, binPath),
+		Host:        host,
+		Port:        port,
+	}
+	params.IsRemote = true
+	if host == "" && port == 0 {
+		params.IsRemote = false
+	}
+
+	tmplExec := tmpl.NewExecutor(&params)
+	err = tmplExec.Execute(mainFile, resultMainFile)
 	if err != nil {
 		return err
 	}
-	err = execTmpl(modFile, resultModFile)
+	err = tmplExec.Execute(modFile, resultModFile)
 	if err != nil {
 		return err
 	}
@@ -135,32 +137,6 @@ func validateTargetFlags() error {
 	default:
 		return fmt.Errorf("you must specify either --binary or --host and --port")
 	}
-}
-
-func execTmpl(in io.Reader, out io.Writer) error {
-	data, err := io.ReadAll(in)
-	if err != nil {
-		return fmt.Errorf("error reading template: %w", err)
-	}
-
-	tmpl, err := template.New(name).Parse(string(data))
-	if err != nil {
-		return fmt.Errorf("error parsing template: %w", err)
-	}
-
-	isRemote := true
-	if host == "" && port == 0 {
-		isRemote = false
-	}
-	return tmpl.Execute(out, templateParams{
-		Module:      Module,
-		ProjectName: name,
-		Version:     Version,
-		BinPath:     binPath,
-		Host:        host,
-		Port:        port,
-		IsRemote:    isRemote,
-	})
 }
 
 func validateName(name string) error {
