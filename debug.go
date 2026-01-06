@@ -24,28 +24,31 @@ var (
 )
 
 type debugger struct {
-	term      terminal
-	attachPid int
+	gdbCommands []string
+	term        terminal
+	attachPid   int
 }
 
 type option func(*debugger)
 
 // Debug starts a gdb debugging session for the given client.
-// It returns an error if the client is not a *conn or if the underlying
-// process is not a *bin. The function also returns an error if it can't spawn
-// a terminal to attach to the process or if the process hasn't attached to
-// gdb after the given timeout.
-//
-// The function try to use terminals of different types (tmux, xterm, gnome-terminal)
-func Debug(client Client, opts ...option) error {
+// It panics if the client is not a *conn or if the underlying
+// process is not a *bin.
+// The function requires gdb installed and terminal (tmux, xterm or gnome-terminal).
+// Otherwise, the function will panic.
+func Debug(client Client, opts ...option) {
+	if _, err := exec.LookPath("gdb"); err != nil {
+		panic("gdb not found in PATH")
+	}
+
 	// get bin from interface Client
 	conn, ok := client.(*conn)
 	if !ok {
-		return errIncorrectClient
+		panic(errIncorrectClient)
 	}
 	bin, ok := conn.conn.(*bin)
 	if !ok {
-		return errIncorrectClient
+		panic(errIncorrectClient)
 	}
 
 	// init debugger
@@ -60,17 +63,15 @@ func Debug(client Client, opts ...option) error {
 	if dbg.term == nil {
 		terminal, err := getTerminal()
 		if err != nil {
-			return fmt.Errorf("can't get terminal for spawn gdb")
+			panic(err)
 		}
 		dbg.term = terminal
 	}
 
-	err := dbg.Start(dbg.term)
+	err := dbg.start()
 	if err != nil {
-		return err
+		panic(err)
 	}
-
-	return nil
 }
 
 // WithTerminal returns an option that sets the terminal to use when spawning
@@ -79,6 +80,23 @@ func Debug(client Client, opts ...option) error {
 func WithTerminal(term terminal) func(*debugger) {
 	return func(client *debugger) {
 		client.term = term
+	}
+}
+
+// WithGDBScript returns an option that sets the commands to be executed
+// by gdb when attaching to the process. The commands are split by newline
+// characters, so the following is a valid command string:
+//
+//	break main\n
+//	info registers\n
+//	continue\n
+//
+// The function can be used to set arbitrary commands to be executed by
+// gdb when attaching to the process. The commands are executed in the order
+// they are given in the string.
+func WithGDBScript(script string) func(*debugger) {
+	return func(client *debugger) {
+		client.gdbCommands = strings.Split(script, "\n")
 	}
 }
 
@@ -98,13 +116,17 @@ func getTerminal() ([]string, error) {
 	return nil, ErrTerminalNotFound
 }
 
-func (d *debugger) Start(term terminal) error {
+func (d *debugger) start() error {
 	gdbCmd := []string{
 		"gdb",
 		"-q",
-		"-p",
-		fmt.Sprintf("%d", d.attachPid),
 	}
+	if len(d.gdbCommands) != 0 {
+		for _, cmd := range d.gdbCommands {
+			gdbCmd = append(gdbCmd, "-ex", cmd)
+		}
+	}
+	gdbCmd = append(gdbCmd, "-p", fmt.Sprintf("%d", d.attachPid))
 
 	args := append(d.term[1:], gdbCmd...)
 	cmd := exec.Command(d.term[0], args...)

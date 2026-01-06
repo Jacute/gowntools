@@ -3,14 +3,14 @@ package payload
 import (
 	"testing"
 
-	"github.com/Jacute/gowntools/binary"
+	"github.com/Jacute/gowntools/binutils"
 	"github.com/stretchr/testify/require"
 )
 
 func TestP64(t *testing.T) {
 	testcases := []struct {
 		name          string
-		addr          binary.Addr
+		addr          binutils.Addr
 		expectedBytes []byte
 	}{
 		{
@@ -38,7 +38,7 @@ func TestP64(t *testing.T) {
 func TestP32(t *testing.T) {
 	testcases := []struct {
 		name          string
-		addr          binary.Addr
+		addr          binutils.Addr
 		expectedBytes []byte
 	}{
 		{
@@ -66,7 +66,7 @@ func TestP32(t *testing.T) {
 func TestP16(t *testing.T) {
 	testcases := []struct {
 		name          string
-		addr          binary.Addr
+		addr          binutils.Addr
 		expectedBytes []byte
 	}{
 		{
@@ -95,7 +95,7 @@ func TestU64(t *testing.T) {
 	testcases := []struct {
 		name         string
 		bytes        []byte
-		expectedAddr binary.Addr
+		expectedAddr binutils.Addr
 	}{
 		{
 			name: "zero",
@@ -125,7 +125,7 @@ func TestU32(t *testing.T) {
 	testcases := []struct {
 		name         string
 		bytes        []byte
-		expectedAddr binary.Addr
+		expectedAddr binutils.Addr
 	}{
 		{
 			name: "zero",
@@ -155,7 +155,7 @@ func TestU16(t *testing.T) {
 	testcases := []struct {
 		name         string
 		bytes        []byte
-		expectedAddr binary.Addr
+		expectedAddr binutils.Addr
 	}{
 		{
 			name: "zero",

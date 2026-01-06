@@ -1,7 +1,8 @@
-package binary
+package binutils
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -83,9 +84,10 @@ func TestAnalyzeBinary(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(tt *testing.T) {
-			info, err := AnalyzeBinary(tc.path)
+			bin, err := AnalyzeBinary(tc.path)
 			require.Equal(tt, tc.expectedErr, err)
 
+			info := bin.Info()
 			require.Equal(tt, tc.expectedArch, info.Arch)
 			require.Equal(tt, tc.expectedOS, info.OS)
 			require.Equal(tt, tc.expectedCompiler, info.Compiler)
@@ -96,32 +98,21 @@ func TestAnalyzeBinary(t *testing.T) {
 	}
 }
 
-func TestGetSymbolAddr(t *testing.T) {
-	testcases := []struct {
-		name     string
-		path     string
-		expected Addr
-	}{
-		{
-			name:     "static",
-			path:     "./testdata/linux_amd64/static_main",
-			expected: Addr(0x0000000000401905),
-		},
-		{
-			name:     "dynamic",
-			path:     "./testdata/linux_amd64/dynamic_main",
-			expected: Addr(0x00000000000011a9),
-		},
-	}
+func TestBinaryInfoString(t *testing.T) {
+	bin, err := AnalyzeBinary("./testdata/linux_amd64/static_main")
+	require.NoError(t, err)
 
-	for _, tc := range testcases {
-		t.Run(tc.name, func(tt *testing.T) {
-			bn, err := AnalyzeBinary(tc.path)
-			require.NoError(tt, err)
+	info := bin.Info()
+	out := info.String()
+	strs := strings.Split(out, "\n")
 
-			addr, err := bn.GetSymbolAddr("win")
-			require.NoError(tt, err)
-			require.Equal(tt, tc.expected, addr)
-		})
-	}
+	require.Contains(t, strs, "OS: Linux")
+	require.Contains(t, strs, "Arch: amd64")
+	require.Contains(t, strs, "Compiler: GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0")
+	require.Contains(t, strs, "Linking: static")
+	require.Contains(t, strs, "Byte Order: LittleEndian")
+	require.Contains(t, strs, "RELRO: partial")
+	require.Contains(t, strs, "Canary: yes")
+	require.Contains(t, strs, "PIE: no")
+	require.Contains(t, strs, "NX: yes")
 }
