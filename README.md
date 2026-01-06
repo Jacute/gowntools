@@ -41,7 +41,11 @@ For finding gadgets (binutils.GetGadgetAddr):
 
 `go get github.com/Jacute/gowntools`
 
-2. Check [examples](./examples/)
+2. Install cli tool
+
+`go install github.com/Jacute/gowntools/cmd/gowncli@latest`
+
+3. Check [examples](./examples/)
 
 ## Documentation
 
