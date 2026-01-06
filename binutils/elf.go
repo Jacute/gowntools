@@ -9,13 +9,75 @@ import (
 	"golang.org/x/arch/x86/x86asm"
 )
 
-func scanELF(f *elf.File) (info *Binary, err error) {
-	info = &Binary{
-		OS:        OSLinux,
-		Arch:      elfArch(f.Machine),
-		ByteOrder: f.ByteOrder,
-		Security: &SecurityInfo{
-			RelRo: RelRoUnknown,
+type elfBinary struct {
+	symbols      map[string]*elf.Symbol
+	dataSections []*elf.Section
+	gadgets      map[gadget][]Addr // all gadgets in executable binary segments
+
+	info *binaryInfo
+}
+
+func (bi *elfBinary) Info() *binaryInfo {
+	return bi.info
+}
+
+func (bi *elfBinary) GetSymbolAddr(symbolName string) (Addr, error) {
+	symbol, ok := bi.symbols[symbolName]
+	if !ok {
+		return 0, fmt.Errorf("symbol %s not found", symbolName)
+	}
+
+	return Addr(symbol.Value), nil
+}
+
+func (bi *elfBinary) GetStringAddr(s string) (Addr, error) {
+	for _, sec := range bi.dataSections {
+		addr, err := findStringInELFSection(sec, s)
+		if err != nil {
+			if err == ErrStringNotFound {
+				continue
+			}
+			return 0, err
+		}
+		return addr, nil
+	}
+	return 0, ErrStringNotFound
+}
+
+func (bi *elfBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
+	gadgetBytes, err := assembleX86(instructions)
+	if err != nil {
+		return nil, err
+	}
+
+	instSlice := readFirstInstructionsX86(gadgetBytes, int(bi.info.Arch.Bitness), maxGadgetLen)
+	var instArr [maxGadgetLen]x86asm.Inst
+	copy(instArr[:], instSlice)
+
+	addrs, ok := bi.gadgets[gadget{
+		insts: instArr,
+		len:   len(instSlice),
+	}]
+	if !ok {
+		return nil, ErrGadgetNotFound
+	}
+
+	return addrs, nil
+}
+
+func (bi *elfBinary) PrintGadgets() {
+	fmt.Println(bi.gadgets)
+}
+
+func scanELF(f *elf.File) (Binary, error) {
+	bin := &elfBinary{
+		info: &binaryInfo{
+			OS:        OSLinux,
+			Arch:      elfArch(f.Machine),
+			ByteOrder: f.ByteOrder,
+			Security: &SecurityInfo{
+				RelRo: RelRoUnknown,
+			},
 		},
 	}
 
@@ -34,38 +96,54 @@ func scanELF(f *elf.File) (info *Binary, err error) {
 			break
 		}
 	}
-	info.Compiler = compiler
+	bin.info.Compiler = compiler
 
 	dynamic, err := getELFSection(f.Sections, ".dynamic")
 	if dynamic == nil && err != nil {
-		info.StaticLinking = true
+		bin.info.StaticLinking = true
 	}
-	info.dataSections = getELFDataSections(f)
+	bin.dataSections = getELFDataSections(f)
 
-	symbols, err := loadELFSymbols(f, info.StaticLinking)
+	symbols, err := loadELFSymbols(f, bin.info.StaticLinking)
 	if err != nil {
 		return nil, err
 	}
-	info.symbols = symbols
+	bin.symbols = symbols
 
-	gadgets, err := loadELFGadgets(f, info.Arch)
+	gadgets, err := loadELFGadgets(f, bin.info.Arch)
 	if err != nil {
 		return nil, err
 	}
-	info.gadgets = gadgets
+	bin.gadgets = gadgets
 
-	info.Security.RelRo, err = scanRelRo(f, dynamic, info.ByteOrder)
+	bin.info.Security.RelRo, err = scanRelRo(f, dynamic, bin.info.ByteOrder)
 	if err != nil {
 		return nil, err
 	}
-	info.Security.PIEEnable = f.Type == elf.ET_DYN
+	bin.info.Security.PIEEnable = f.Type == elf.ET_DYN
 	if _, ok := symbols["__stack_chk_fail"]; ok {
-		info.Security.CanaryEnable = true
+		bin.info.Security.CanaryEnable = true
 	}
-	info.Security.NXEnable = isNXEnable(f.Progs)
+	bin.info.Security.NXEnable = isNXEnable(f.Progs)
 
-	return info, nil
+	return bin, nil
 }
+
+func elfArch(m elf.Machine) Arch {
+	switch m {
+	case elf.EM_X86_64:
+		return ArchAmd64
+	case elf.EM_386:
+		return ArchI386
+	case elf.EM_AARCH64:
+		return ArchArm64
+	case elf.EM_ARM:
+		return ArchArm32
+	default:
+		return ArchUnknown
+	}
+}
+
 func getELFSection(sections []*elf.Section, name string) (*elf.Section, error) {
 	for _, sec := range sections {
 		if sec.Name == name {
@@ -97,11 +175,11 @@ func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, er
 	return symbols, nil
 }
 
-func loadELFGadgets(f *elf.File, arch Arch) (map[Gadget][]Addr, error) {
+func loadELFGadgets(f *elf.File, arch Arch) (map[gadget][]Addr, error) {
 	const gadgetTerminatorOp = x86asm.RET // "ret" instruction
 	const gadgetTerminatorOpcode = '\xc3' // TODO: add other ret terminators
 
-	gadgets := make(map[Gadget][]Addr)
+	gadgets := make(map[gadget][]Addr)
 	for _, p := range f.Progs {
 		if p.Type != elf.PT_LOAD || (p.Flags&elf.PF_X) == 0 {
 			continue
@@ -122,7 +200,7 @@ func loadELFGadgets(f *elf.File, arch Arch) (map[Gadget][]Addr, error) {
 				buf := make([]byte, j+1)
 				copy(buf, code[i-j:i+1])
 
-				gadget := [maxGadgetLen]x86asm.Inst{}
+				insts := [maxGadgetLen]x86asm.Inst{}
 				instLen := 0
 				for len(buf) > 0 {
 					inst, err := x86asm.Decode(buf, int(arch.Bitness))
@@ -131,13 +209,13 @@ func loadELFGadgets(f *elf.File, arch Arch) (map[Gadget][]Addr, error) {
 						continue
 					}
 					buf = buf[inst.Len:]
-					gadget[instLen] = inst
+					insts[instLen] = inst
 					instLen++
 				}
 
-				g := Gadget{
-					Insts: gadget,
-					Len:   instLen,
+				g := gadget{
+					insts: insts,
+					len:   instLen,
 				}
 				addr := Addr(p.Vaddr + uint64(i-j))
 
@@ -179,23 +257,4 @@ func findStringInELFSection(section *elf.Section, str string) (Addr, error) {
 
 	var nilAddr Addr
 	return nilAddr, ErrStringNotFound
-}
-
-func readFirstInstructionsX86(code []byte, bitness int, n int) []x86asm.Inst {
-	insts := make([]x86asm.Inst, 0, n)
-
-	offset := 0
-	for len(code) > 0 && len(insts) < n {
-		inst, err := x86asm.Decode(code, bitness)
-		if err != nil {
-			code = code[1:]
-			offset++
-			continue
-		}
-		insts = append(insts, inst)
-		code = code[inst.Len:]
-		offset += inst.Len
-	}
-
-	return insts
 }

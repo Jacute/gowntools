@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"golang.org/x/arch/x86/x86asm"
@@ -63,28 +61,24 @@ func (a Addr) String() string {
 	return fmt.Sprintf("0x%x", uint64(a))
 }
 
-type Gadget struct {
-	Insts [maxGadgetLen]x86asm.Inst
-	Len   int
+type gadget struct {
+	insts [maxGadgetLen]x86asm.Inst
+	len   int
 }
 
-type Binary struct {
-	symbols      map[string]*elf.Symbol
-	dataSections []*elf.Section
-	gadgets      map[Gadget][]Addr // all gadgets in executable binary segments
-
+type binaryInfo struct {
 	Arch          Arch
 	OS            OS
 	Compiler      string
+	Linking       string
+	Security      *SecurityInfo
 	StaticLinking bool
 	ByteOrder     binary.ByteOrder
-	Security      *SecurityInfo
 	// Packer string
 	// Language string
-	// Compiler string
 }
 
-func (bi *Binary) String() string {
+func (bi *binaryInfo) String() string {
 	var builder strings.Builder
 
 	builder.WriteString("=== BINARY INFO ===\n")
@@ -125,29 +119,55 @@ func (bi *Binary) String() string {
 	return builder.String()
 }
 
+type Binary interface {
+	// Info returns binary info like arch, os, compiler, security mitigations, etc
+	Info() *binaryInfo
+
+	// GetSymbolAddr returns the address of the symbol with the given name.
+	// If the symbol is not found, an error is returned.
+	GetSymbolAddr(symbolName string) (Addr, error)
+
+	// GetStringAddr returns the address of the given string in the binary's .data or .rodata
+	// sections. If the string is not found, an error of type ErrStringNotFound
+	// is returned.
+	GetStringAddr(s string) (Addr, error)
+
+	GetGadgetAddr(instructions []string) ([]Addr, error)
+}
+
+type SymbolTable struct {
+	Addr Addr
+}
+
+type Section struct {
+}
+
+type Segment struct {
+}
+
 // AnalyzeBinary analyzes the given binary and returns information about it.
 //
 // The path must be a valid ELF, PE or Mach-O file. If the file is not
 // recognized, an error of type ErrUnknownBinary is returned.
 //
-// The returned Binary contains information about the binary's architecture,
+// The returned ELF contains information about the binary's architecture,
 // operating system, compiler, linking, and security.
 //
 // The returned error is nil if the analysis is successful, or an error
 // describing the problem if the analysis fails.
-func AnalyzeBinary(path string) (*Binary, error) {
+func AnalyzeBinary(path string) (Binary, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, err
 	}
 
-	var info *Binary
+	var bin Binary
 	var openErr error
 	if ef, err := elf.Open(path); err == nil {
-		info, openErr = scanELF(ef)
+		bin, openErr = scanELF(ef)
 	} else if pf, err := pe.Open(path); err == nil {
-		info, openErr = scanPE(pf)
+		bin, openErr = scanPE(pf)
 	} else if mf, err := macho.Open(path); err == nil {
-		info, openErr = scanMacho(mf)
+		bin, openErr = scanMacho(mf)
 	} else {
 		return nil, ErrUnknownBinary
 	}
@@ -156,168 +176,5 @@ func AnalyzeBinary(path string) (*Binary, error) {
 		return nil, openErr
 	}
 
-	return info, nil
-}
-
-// GetSymbolAddr returns the address of the symbol with the given name.
-// If the symbol is not found, an error is returned.
-// Panics if binary isn't ELF
-func (bi *Binary) GetSymbolAddr(symbolName string) (Addr, error) {
-	if bi.OS != OSLinux {
-		panic("GetSymbolAddr supports only ELF binaries")
-	}
-
-	symbol, ok := bi.symbols[symbolName]
-	if !ok {
-		return 0, fmt.Errorf("symbol %s not found", symbolName)
-	}
-
-	return Addr(symbol.Value), nil
-}
-
-// GetStringAddr returns the address of the given string in the binary's .data or .rodata
-// sections. If the string is not found, an error of type ErrStringNotFound
-// is returned.
-// Panics if binary isn't ELF
-func (bi *Binary) GetStringAddr(s string) (Addr, error) {
-	if bi.OS != OSLinux {
-		var nilAddr Addr
-		return nilAddr, fmt.Errorf("GetStringAddr supports only ELF binaries")
-	}
-
-	for _, sec := range bi.dataSections {
-		addr, err := findStringInELFSection(sec, s)
-		if err != nil {
-			if err == ErrStringNotFound {
-				continue
-			}
-			return 0, err
-		}
-		return addr, nil
-	}
-	return 0, ErrStringNotFound
-}
-
-func (bi *Binary) GetGadgetAddr(gadget []string) ([]Addr, error) {
-	if bi.OS != OSLinux {
-		return nil, fmt.Errorf("GetGadgetAddr supports only ELF binaries")
-	}
-
-	gadgetBytes, err := assembleX86(gadget)
-	if err != nil {
-		return nil, err
-	}
-
-	instSlice := readFirstInstructionsX86(gadgetBytes, int(bi.Arch.Bitness), maxGadgetLen)
-	var instArr [maxGadgetLen]x86asm.Inst
-	copy(instArr[:], instSlice)
-
-	addrs, ok := bi.gadgets[Gadget{
-		Insts: instArr,
-		Len:   len(instSlice),
-	}]
-	if !ok {
-		return nil, ErrGadgetNotFound
-	}
-
-	return addrs, nil
-}
-
-func (bi *Binary) PrintGadgets() {
-	fmt.Println(bi.gadgets)
-}
-
-func elfArch(m elf.Machine) Arch {
-	switch m {
-	case elf.EM_X86_64:
-		return ArchAmd64
-	case elf.EM_386:
-		return ArchI386
-	case elf.EM_AARCH64:
-		return ArchArm64
-	case elf.EM_ARM:
-		return ArchArm32
-	default:
-		return ArchUnknown
-	}
-}
-
-func peArch(m uint16) Arch {
-	switch m {
-	case pe.IMAGE_FILE_MACHINE_AMD64:
-		return ArchAmd64
-	case pe.IMAGE_FILE_MACHINE_I386:
-		return ArchI386
-	case pe.IMAGE_FILE_MACHINE_ARM64:
-		return ArchArm64
-	case pe.IMAGE_FILE_MACHINE_ARM:
-		return ArchArm32
-	default:
-		return ArchUnknown
-	}
-}
-
-func machoArch(c macho.Cpu) Arch {
-	switch c {
-	case macho.CpuAmd64:
-		return ArchAmd64
-	case macho.Cpu386:
-		return ArchI386
-	case macho.CpuArm64:
-		return ArchAmd64
-	case macho.CpuArm:
-		return ArchArm32
-	default:
-		return ArchUnknown
-	}
-}
-
-func scanPE(f *pe.File) (info *Binary, err error) {
-	info = &Binary{
-		OS:        OSWindows,
-		Arch:      peArch(f.Machine),
-		ByteOrder: binary.LittleEndian,
-		Security: &SecurityInfo{
-			RelRo: RelRoUnknown,
-		},
-	}
-	// TODO: scan linking, compiler, security, etc
-	return info, nil
-}
-
-func scanMacho(f *macho.File) (info *Binary, err error) {
-	info = &Binary{
-		OS:        OSMac,
-		Arch:      machoArch(f.Cpu),
-		ByteOrder: f.ByteOrder,
-		Security: &SecurityInfo{
-			RelRo: RelRoUnknown,
-		},
-	}
-	// TODO: scan linking, compiler, security, etc
-	return info, nil
-}
-
-func assembleX86(code []string) ([]byte, error) {
-	src := "BITS 64\n" + strings.Join(code, "\n") + "\n"
-
-	dir, err := os.MkdirTemp("", "asm")
-	if err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(dir)
-
-	asmPath := filepath.Join(dir, "code.asm")
-	binPath := filepath.Join(dir, "code.bin")
-
-	if err := os.WriteFile(asmPath, []byte(src), 0644); err != nil {
-		return nil, err
-	}
-
-	cmd := exec.Command("nasm", "-f", "bin", asmPath, "-o", binPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("nasm error: %v\n%s", err, out)
-	}
-
-	return os.ReadFile(binPath)
+	return bin, nil
 }

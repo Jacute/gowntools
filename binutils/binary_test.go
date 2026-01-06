@@ -83,9 +83,10 @@ func TestAnalyzeBinary(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(tt *testing.T) {
-			info, err := AnalyzeBinary(tc.path)
+			bin, err := AnalyzeBinary(tc.path)
 			require.Equal(tt, tc.expectedErr, err)
 
+			info := bin.Info()
 			require.Equal(tt, tc.expectedArch, info.Arch)
 			require.Equal(tt, tc.expectedOS, info.OS)
 			require.Equal(tt, tc.expectedCompiler, info.Compiler)
