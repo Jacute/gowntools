@@ -1,16 +1,20 @@
 package binutils
 
 import (
-	"bytes"
 	"debug/elf"
 	"debug/macho"
 	"debug/pe"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
+
+	"golang.org/x/arch/x86/x86asm"
+)
+
+const (
+	maxGadgetLen = 12 // max count bytes in gadget
 )
 
 var (
@@ -18,6 +22,7 @@ var (
 	ErrUnknownOS      = errors.New("unknown os")
 	ErrUnknownBinary  = errors.New("binary type is unknown")
 	ErrStringNotFound = errors.New("string not found")
+	ErrGadgetNotFound = errors.New("gadget not found")
 )
 
 type OS string
@@ -56,9 +61,15 @@ func (a Addr) String() string {
 	return fmt.Sprintf("0x%x", uint64(a))
 }
 
-type Info struct {
+type Gadget struct {
+	Insts [maxGadgetLen]x86asm.Inst
+	Len   int
+}
+
+type Binary struct {
 	symbols      map[string]*elf.Symbol
 	dataSections []*elf.Section
+	gadgets      map[Gadget][]Addr // all gadgets in executable binary segments
 
 	Arch          Arch
 	OS            OS
@@ -71,7 +82,7 @@ type Info struct {
 	// Compiler string
 }
 
-func (bi *Info) String() string {
+func (bi *Binary) String() string {
 	var builder strings.Builder
 
 	builder.WriteString("=== BINARY INFO ===\n")
@@ -117,17 +128,17 @@ func (bi *Info) String() string {
 // The path must be a valid ELF, PE or Mach-O file. If the file is not
 // recognized, an error of type ErrUnknownBinary is returned.
 //
-// The returned Info contains information about the binary's architecture,
+// The returned Binary contains information about the binary's architecture,
 // operating system, compiler, linking, and security.
 //
 // The returned error is nil if the analysis is successful, or an error
 // describing the problem if the analysis fails.
-func AnalyzeBinary(path string) (*Info, error) {
+func AnalyzeBinary(path string) (*Binary, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, err
 	}
 
-	var info *Info
+	var info *Binary
 	var openErr error
 	if ef, err := elf.Open(path); err == nil {
 		info, openErr = scanELF(ef)
@@ -148,7 +159,12 @@ func AnalyzeBinary(path string) (*Info, error) {
 
 // GetSymbolAddr returns the address of the symbol with the given name.
 // If the symbol is not found, an error is returned.
-func (bi *Info) GetSymbolAddr(symbolName string) (Addr, error) {
+// Panics if binary isn't ELF
+func (bi *Binary) GetSymbolAddr(symbolName string) (Addr, error) {
+	if bi.OS != OSLinux {
+		panic("GetSymbolAddr supports only ELF binaries")
+	}
+
 	symbol, ok := bi.symbols[symbolName]
 	if !ok {
 		return 0, fmt.Errorf("symbol %s not found", symbolName)
@@ -160,9 +176,15 @@ func (bi *Info) GetSymbolAddr(symbolName string) (Addr, error) {
 // GetStringAddr returns the address of the given string in the binary's .data or .rodata
 // sections. If the string is not found, an error of type ErrStringNotFound
 // is returned.
-func (bi *Info) GetStringAddr(s string) (Addr, error) {
+// Panics if binary isn't ELF
+func (bi *Binary) GetStringAddr(s string) (Addr, error) {
+	if bi.OS != OSLinux {
+		var nilAddr Addr
+		return nilAddr, fmt.Errorf("GetStringAddr supports only ELF binaries")
+	}
+
 	for _, sec := range bi.dataSections {
-		addr, err := findStringInSection(sec, s)
+		addr, err := findStringInELFSection(sec, s)
 		if err != nil {
 			if err == ErrStringNotFound {
 				continue
@@ -172,6 +194,30 @@ func (bi *Info) GetStringAddr(s string) (Addr, error) {
 		return addr, nil
 	}
 	return 0, ErrStringNotFound
+}
+
+func (bi *Binary) GetGadgetAddr(gadget []byte) ([]Addr, error) {
+	if bi.OS != OSLinux {
+		return nil, fmt.Errorf("GetGadgetAddr supports only ELF binaries")
+	}
+
+	instSlice := readFirstInstructionsI386(gadget, int(bi.Arch.Bitness), maxGadgetLen)
+	var instArr [maxGadgetLen]x86asm.Inst
+	copy(instArr[:], instSlice)
+
+	addrs, ok := bi.gadgets[Gadget{
+		Insts: instArr,
+		Len:   len(instSlice),
+	}]
+	if !ok {
+		return nil, ErrGadgetNotFound
+	}
+
+	return addrs, nil
+}
+
+func (bi *Binary) PrintGadgets() {
+	fmt.Println(bi.gadgets)
 }
 
 func elfArch(m elf.Machine) Arch {
@@ -219,60 +265,8 @@ func machoArch(c macho.Cpu) Arch {
 	}
 }
 
-func scanELF(f *elf.File) (info *Info, err error) {
-	info = &Info{
-		OS:        OSLinux,
-		Arch:      elfArch(f.Machine),
-		ByteOrder: f.ByteOrder,
-		Security: &SecurityInfo{
-			RelRo: RelRoUnknown,
-		},
-	}
-
-	var compiler string
-	for _, sec := range f.Sections {
-		if sec.Name == ".comment" {
-			f := sec.Open()
-			data, err := io.ReadAll(f)
-			if err != nil {
-				return nil, err
-			}
-			compiler = string(data)
-			if compiler[len(compiler)-1] == '\x00' {
-				compiler = compiler[:len(compiler)-1]
-			}
-			break
-		}
-	}
-	info.Compiler = compiler
-
-	dynamic, err := getSection(f.Sections, ".dynamic")
-	if dynamic == nil && err != nil {
-		info.StaticLinking = true
-	}
-	info.dataSections = getDataSections(f.Sections)
-
-	symbols, err := loadELFSymbols(f, info.StaticLinking)
-	if err != nil {
-		return nil, err
-	}
-	info.symbols = symbols
-
-	info.Security.RelRo, err = scanRelRo(f, dynamic, info.ByteOrder)
-	if err != nil {
-		return nil, err
-	}
-	info.Security.PIEEnable = f.Type == elf.ET_DYN
-	if _, ok := symbols["__stack_chk_fail"]; ok {
-		info.Security.CanaryEnable = true
-	}
-	info.Security.NXEnable = isNXEnable(f.Progs)
-
-	return info, nil
-}
-
-func scanPE(f *pe.File) (info *Info, err error) {
-	info = &Info{
+func scanPE(f *pe.File) (info *Binary, err error) {
+	info = &Binary{
 		OS:        OSWindows,
 		Arch:      peArch(f.Machine),
 		ByteOrder: binary.LittleEndian,
@@ -284,8 +278,8 @@ func scanPE(f *pe.File) (info *Info, err error) {
 	return info, nil
 }
 
-func scanMacho(f *macho.File) (info *Info, err error) {
-	info = &Info{
+func scanMacho(f *macho.File) (info *Binary, err error) {
+	info = &Binary{
 		OS:        OSMac,
 		Arch:      machoArch(f.Cpu),
 		ByteOrder: f.ByteOrder,
@@ -295,64 +289,4 @@ func scanMacho(f *macho.File) (info *Info, err error) {
 	}
 	// TODO: scan linking, compiler, security, etc
 	return info, nil
-}
-
-func getSection(sections []*elf.Section, name string) (*elf.Section, error) {
-	for _, sec := range sections {
-		if sec.Name == name {
-			return sec, nil
-		}
-	}
-	return nil, fmt.Errorf("section with name %s not found", name)
-}
-
-func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, error) {
-	symbols := make(map[string]*elf.Symbol)
-
-	var syms []elf.Symbol
-
-	syms, _ = f.Symbols() // skip error if symbols not found
-	if !staticLinking {
-		dynSyms, err := f.DynamicSymbols()
-		if err != nil {
-			return nil, err
-		}
-		syms = append(syms, dynSyms...)
-	}
-
-	for i := range syms {
-		s := syms[i]
-		symbols[syms[i].Name] = &s
-	}
-
-	return symbols, nil
-}
-
-func getDataSections(sections []*elf.Section) []*elf.Section {
-	dataSections := make([]*elf.Section, 0)
-	for _, sec := range sections {
-		if sec.Name == ".data" || sec.Name == ".rodata" {
-			dataSections = append(dataSections, sec)
-		}
-	}
-
-	return dataSections
-}
-
-func findStringInSection(section *elf.Section, str string) (Addr, error) {
-	data, err := section.Data()
-	if err != nil {
-		return 0, err
-	}
-
-	stringBytes := append([]byte(str), '\x00')
-	for i := range data {
-		if bytes.Equal(data[i:i+len(stringBytes)], stringBytes) {
-			addr := Addr(section.Addr + uint64(i))
-			return addr, nil
-		}
-	}
-
-	var nilAddr Addr
-	return nilAddr, ErrStringNotFound
 }

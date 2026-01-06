@@ -2,6 +2,7 @@ package binutils
 
 import (
 	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -122,6 +123,45 @@ func TestGetSymbolAddr(t *testing.T) {
 			addr, err := bn.GetSymbolAddr("win")
 			require.NoError(tt, err)
 			require.Equal(tt, tc.expected, addr)
+		})
+	}
+}
+
+func TestGetGadgetAddr(t *testing.T) {
+	testcases := []struct {
+		name         string
+		libcPath     string
+		gadget       []byte
+		expectedAddr Addr
+		expectedErr  error
+	}{
+		{
+			name:         "pop rdi ; ret",
+			libcPath:     "./testdata/libc/libc.so.6",
+			gadget:       []byte{0x5f, 0xc3},
+			expectedAddr: Addr(0x000000000002a145),
+		},
+		{
+			name:        "not found",
+			libcPath:    "./testdata/libc/libc.so.6",
+			gadget:      []byte{0x12, 0x34, 0x56, 0x78},
+			expectedErr: ErrGadgetNotFound,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(tt *testing.T) {
+			binInfo, err := AnalyzeBinary(tc.libcPath)
+			require.NoError(tt, err)
+
+			// binInfo.PrintGadgets()
+			addrs, err := binInfo.GetGadgetAddr(tc.gadget)
+			require.ErrorIs(tt, tc.expectedErr, err)
+
+			fmt.Println(addrs)
+			if tc.expectedErr == nil {
+				require.Contains(tt, addrs, tc.expectedAddr)
+			}
 		})
 	}
 }
