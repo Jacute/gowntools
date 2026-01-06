@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	maxGadgetLen = 12 // max count bytes in gadget
+	MaxGadgetLen = 20 // max count bytes in gadget
 )
 
 var (
@@ -62,7 +62,7 @@ func (a Addr) String() string {
 }
 
 type gadget struct {
-	insts [maxGadgetLen]x86asm.Inst
+	insts [MaxGadgetLen]x86asm.Inst
 	len   int
 }
 
@@ -133,16 +133,6 @@ type Binary interface {
 	GetStringAddr(s string) (Addr, error)
 
 	GetGadgetAddr(instructions []string) ([]Addr, error)
-}
-
-type SymbolTable struct {
-	Addr Addr
-}
-
-type Section struct {
-}
-
-type Segment struct {
 }
 
 // AnalyzeBinary analyzes the given binary and returns information about it.

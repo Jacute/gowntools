@@ -50,8 +50,8 @@ func (bi *elfBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
 		return nil, err
 	}
 
-	instSlice := readFirstInstructionsX86(gadgetBytes, int(bi.info.Arch.Bitness), maxGadgetLen)
-	var instArr [maxGadgetLen]x86asm.Inst
+	instSlice := readFirstInstructionsX86(gadgetBytes, int(bi.info.Arch.Bitness), MaxGadgetLen)
+	var instArr [MaxGadgetLen]x86asm.Inst
 	copy(instArr[:], instSlice)
 
 	addrs, ok := bi.gadgets[gadget{
@@ -196,11 +196,11 @@ func loadELFGadgets(f *elf.File, arch Arch) (map[gadget][]Addr, error) {
 				continue
 			}
 
-			for j := 0; j < maxGadgetLen && j <= i; j++ {
+			for j := 0; j < MaxGadgetLen && j <= i; j++ {
 				buf := make([]byte, j+1)
 				copy(buf, code[i-j:i+1])
 
-				insts := [maxGadgetLen]x86asm.Inst{}
+				insts := [MaxGadgetLen]x86asm.Inst{}
 				instLen := 0
 				for len(buf) > 0 {
 					inst, err := x86asm.Decode(buf, int(arch.Bitness))
