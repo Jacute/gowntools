@@ -15,10 +15,10 @@ type elfBinary struct {
 	dataSections []*elf.Section
 	gadgets      map[gadget][]Addr // all gadgets in executable binary segments
 
-	info *binaryInfo
+	info *BinaryInfo
 }
 
-func (bi *elfBinary) Info() *binaryInfo {
+func (bi *elfBinary) Info() *BinaryInfo {
 	return bi.info
 }
 
@@ -71,7 +71,7 @@ func (bi *elfBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
 
 func scanELF(f *elf.File) (Binary, error) {
 	bin := &elfBinary{
-		info: &binaryInfo{
+		info: &BinaryInfo{
 			OS:        OSLinux,
 			Arch:      elfArch(f.Machine),
 			ByteOrder: f.ByteOrder,

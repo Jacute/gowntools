@@ -3,10 +3,10 @@ package binutils
 import "debug/macho"
 
 type machoBinary struct {
-	info *binaryInfo
+	info *BinaryInfo
 }
 
-func (bin *machoBinary) Info() *binaryInfo {
+func (bin *machoBinary) Info() *BinaryInfo {
 	return bin.info
 }
 
@@ -24,7 +24,7 @@ func (bin *machoBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
 
 func scanMacho(f *macho.File) (bin Binary, err error) {
 	bin = &machoBinary{
-		info: &binaryInfo{
+		info: &BinaryInfo{
 			OS:        OSMac,
 			Arch:      machoArch(f.Cpu),
 			ByteOrder: f.ByteOrder,
