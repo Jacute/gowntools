@@ -117,17 +117,7 @@ func getTerminal() ([]string, error) {
 }
 
 func (d *debugger) start() error {
-	gdbCmd := []string{
-		"gdb",
-		"-q",
-	}
-	if len(d.gdbCommands) != 0 {
-		for _, cmd := range d.gdbCommands {
-			gdbCmd = append(gdbCmd, "-ex", cmd)
-		}
-	}
-	gdbCmd = append(gdbCmd, "-p", fmt.Sprintf("%d", d.attachPid))
-
+	gdbCmd := d.buildGDBcmd()
 	args := append(d.term[1:], gdbCmd...)
 	cmd := exec.Command(d.term[0], args...)
 
@@ -162,4 +152,18 @@ func (d *debugger) waitForAttach(timeout time.Duration) error {
 	}
 
 	return fmt.Errorf("timeout waiting for gdb attach")
+}
+
+func (d *debugger) buildGDBcmd() []string {
+	gdbCmd := []string{
+		"gdb",
+		"-q",
+	}
+	if len(d.gdbCommands) != 0 {
+		for _, cmd := range d.gdbCommands {
+			gdbCmd = append(gdbCmd, "-ex", cmd)
+		}
+	}
+	gdbCmd = append(gdbCmd, "-p", fmt.Sprintf("%d", d.attachPid))
+	return gdbCmd
 }
