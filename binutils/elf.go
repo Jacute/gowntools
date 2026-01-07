@@ -248,7 +248,7 @@ func findStringInELFSection(section *elf.Section, str string) (Addr, error) {
 	}
 
 	stringBytes := append([]byte(str), '\x00')
-	for i := range data {
+	for i := 0; i < len(data)-len(stringBytes); i++ {
 		if bytes.Equal(data[i:i+len(stringBytes)], stringBytes) {
 			addr := Addr(section.Addr + uint64(i))
 			return addr, nil

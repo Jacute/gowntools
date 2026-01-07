@@ -73,3 +73,39 @@ func TestGetGadgetAddrELF(t *testing.T) {
 		})
 	}
 }
+
+func TestGetStringAddrELF(t *testing.T) {
+	testcases := []struct {
+		name         string
+		binaryPath   string
+		str          string
+		expectedErr  error
+		expectedAddr Addr
+	}{
+		{
+			name:         "ok",
+			binaryPath:   "./testdata/libc/libc.so.6",
+			str:          "/bin/sh",
+			expectedAddr: Addr(0x1a7ea4),
+		},
+		{
+			name:        "str not found",
+			binaryPath:  "./testdata/libc/libc.so.6",
+			str:         "njdasnjdaldjasml",
+			expectedErr: ErrStringNotFound,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(tt *testing.T) {
+			bn, err := AnalyzeBinary(tc.binaryPath)
+			if err != nil {
+				tt.Fatalf("failed to analyze binary: %v", err)
+			}
+
+			addr, err := bn.GetStringAddr(tc.str)
+			require.ErrorIs(tt, err, tc.expectedErr)
+			require.Equal(tt, tc.expectedAddr, addr)
+		})
+	}
+}
