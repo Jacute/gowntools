@@ -1,43 +1,44 @@
 package main
 
 import (
-	{{- if .IsRemote }}
+	{{- if not .BinPath }}
 	"encoding/binary"
-	{{- end}}
+	{{ end }}
 	pwn "github.com/Jacute/gowntools"
 	"github.com/Jacute/gowntools/binutils"
 	"github.com/Jacute/gowntools/payload"
 )
-
+{{ if .BinPath }}
 const binpath string = "{{.BinPath}}"
-
+{{ end }}
 func main() {
-	{{- if .IsRemote }}
+{{- if .IsRemote }}
 	c := pwn.NewTCP("{{.Host}}:{{.Port}}")
 	defer c.Close()
-
-	exploit(c)
-	{{- else }}
+{{- else }}
 	c := pwn.NewBinary(binpath)
 	defer c.Close()
-	binInfo, err := binutils.AnalyzeBinary(binpath)
+{{- end }}
+{{- if .BinPath }}
+	bin, err := binutils.AnalyzeBinary(binpath)
 	if err != nil {
 		panic(err)
 	}
+	binInfo := bin.Info()
 
 	exploit(c, binInfo)
-	{{- end }}
-
+{{ else }}
+	exploit(c)
+{{ end }}
 	c.Interactive()
 }
-
-{{ if .IsRemote -}}
+{{ if not .BinPath }}
 func exploit(c pwn.Client) {
 	pb := payload.NewBuilder(binutils.ArchAmd64, binary.LittleEndian)
 {{- else }}
 func exploit(c pwn.Client, binInfo *binutils.BinaryInfo) {
 	pb := payload.NewBuilder(binInfo.Arch, binInfo.ByteOrder)
-	{{- end }}
+{{- end }}
 	payload := genPayload(pb)
 
 	// exploit should be here

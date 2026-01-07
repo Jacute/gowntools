@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"embed"
 	"errors"
 	"fmt"
 	"os"
@@ -14,14 +13,11 @@ import (
 )
 
 var (
-	templates = []string{
+	templatesInput = []string{
 		"templates/main.go.tmpl",
 		"templates/go.mod.tmpl",
 	}
 )
-
-//go:embed templates/*
-var templatesFS embed.FS
 
 // cli parameters
 var (
@@ -58,23 +54,6 @@ func genTemplate(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Generating exploit template...")
 
-	// make out dir
-	err = os.Mkdir(name, 0744)
-	if err != nil && os.IsNotExist(err) {
-		return err
-	}
-	// open files
-	resultMainFile, err := os.Create(fmt.Sprintf("%s/main.go", name))
-	if err != nil {
-		return err
-	}
-	defer resultMainFile.Close()
-	resultModFile, err := os.Create(fmt.Sprintf("%s/go.mod", name))
-	if err != nil {
-		return err
-	}
-	defer resultModFile.Close()
-
 	// prepare params
 	params := tmpl.TemplateParams{
 		Module:      Module,
@@ -89,17 +68,30 @@ func genTemplate(cmd *cobra.Command, args []string) error {
 		params.IsRemote = false
 	}
 
-	tmplExec := tmpl.NewExecutor(&params)
-	err = tmplExec.Execute(mainFile, resultMainFile)
-	if err != nil {
-		return err
+	ctx := cmd.Context()
+	executor := tmpl.NewExecutor(&params)
+
+	// write templates
+	templates := make([]*tmpl.Template, len(templatesInput))
+	for i, pathIn := range templatesInput {
+		pathOut := path.Join(
+			curDir,
+			name,
+			strings.TrimSuffix(strings.TrimPrefix(pathIn, "templates/"), ".tmpl"),
+		)
+		t, err := tmpl.NewTemplateOnFiles(pathIn, pathOut)
+		if err != nil {
+			return err
+		}
+		templates[i] = t
 	}
-	err = tmplExec.Execute(modFile, resultModFile)
+
+	err = executor.Process(ctx, templates...)
 	if err != nil {
 		return err
 	}
 
-	modCmd := exec.CommandContext(cmd.Context(), "go", "mod", "tidy")
+	modCmd := exec.CommandContext(ctx, "go", "mod", "tidy")
 	modCmd.Dir = path.Join(curDir, name)
 
 	modCmd.Stderr = os.Stderr

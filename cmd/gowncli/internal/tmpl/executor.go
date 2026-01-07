@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"text/template"
 )
 
@@ -18,36 +19,47 @@ type TemplateParams struct {
 }
 
 type Executor struct {
-	params     *TemplateParams
-	templateCh chan *Template
+	params *TemplateParams
 }
 
 func NewExecutor(params *TemplateParams) *Executor {
 	return &Executor{
-		params:     params,
-		templateCh: make(chan *Template),
+		params: params,
 	}
 }
 
 func (e *Executor) Process(ctx context.Context, templates ...*Template) error {
-	defer close(e.templateCh)
+	execCh := make(chan *Template)
+	errCh := make(chan error, 1)
 
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
 	go func() {
-		err := e.Execute(ctx)
+		defer wg.Done()
+		err := e.execute(ctx, execCh)
 		if err != nil {
-			// TODO: process err
+			errCh <- err
 		}
 	}()
 
-	err := e.PrepareTemplates(ctx, templates...)
-	if err != nil {
-		return err
-	}
+	go func() {
+		defer wg.Done()
+		err := e.prepareTemplates(ctx, execCh, templates...)
+		if err != nil {
+			errCh <- err
+		}
+		close(execCh)
+	}()
 
-	return nil
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	return <-errCh
 }
 
-func (e *Executor) PrepareTemplates(ctx context.Context, templates ...*Template) error {
+func (e *Executor) prepareTemplates(ctx context.Context, execCh chan *Template, templates ...*Template) error {
 	for _, tmpl := range templates {
 		select {
 		case <-ctx.Done():
@@ -66,19 +78,19 @@ func (e *Executor) PrepareTemplates(ctx context.Context, templates ...*Template)
 		}
 		tmpl.t = t
 
-		e.templateCh <- tmpl
+		execCh <- tmpl
 	}
 
 	return nil
 }
 
-func (e *Executor) Execute(ctx context.Context) error {
+func (e *Executor) execute(ctx context.Context, execCh chan *Template) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case tmpl := <-e.templateCh:
-			if tmpl == nil {
+		case tmpl, ok := <-execCh:
+			if !ok {
 				return nil
 			}
 			err := tmpl.t.Execute(tmpl.w, e.params)
