@@ -71,7 +71,7 @@ func TestReadAll(t *testing.T) {
 	require.Equal(t, 18, n)
 }
 
-func TestReadLine(t *testing.T) {
+func TestInteractiveIO(t *testing.T) {
 	st, err := testsuite.NewTCPServer()
 	require.NoError(t, err)
 	t.Cleanup(func() {
