@@ -10,7 +10,7 @@ import (
 var infoCmd = &cobra.Command{
 	Use:   "info <elf-path>",
 	Short: "Print information about binary (arch, os, security mitigations)",
-	RunE: func(_ *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return fmt.Errorf("missing <path>")
 		}
@@ -19,7 +19,7 @@ var infoCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Println(binInfo.Info())
+		cmd.Print(binInfo.Info())
 		return nil
 	},
 }

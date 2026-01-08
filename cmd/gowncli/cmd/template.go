@@ -33,82 +33,95 @@ var (
 	nameBlacklist          = "/\\:*!?\"<>| "
 )
 
-// templateCmd represents the template command
-var templateCmd = &cobra.Command{
-	Use:   "template",
-	Short: "generation of exploit templates",
-	PreRunE: func(_ *cobra.Command, _ []string) error {
-		return validateTargetFlags()
-	},
-	RunE: genTemplate,
-}
+func NewTemplateCmd(version, module string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "template",
+		Short: "generation of exploit templates",
+		PreRunE: func(_ *cobra.Command, _ []string) error {
+			return validateTargetFlags()
+		},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := validateName(name); err != nil {
+				return fmt.Errorf("error validating name: %w", err)
+			}
+			curDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("error getting current dir: %w", err)
+			}
 
-func genTemplate(cmd *cobra.Command, _ []string) error {
-	if err := validateName(name); err != nil {
-		return err
+			cmd.Println("Generating exploit template...")
+
+			exploitDir := path.Join(curDir, name)
+			if _, err := os.Stat(exploitDir); os.IsNotExist(err) {
+				if err := os.MkdirAll(exploitDir, 0755); err != nil {
+					return fmt.Errorf("error making dir %s: %w", exploitDir, err)
+				}
+			}
+
+			// prepare params
+			params := tmpl.TemplateParams{
+				Module:      module,
+				ProjectName: name,
+				Version:     version,
+				BinPath:     path.Join(exploitDir, binPath),
+				Host:        host,
+				Port:        port,
+			}
+			params.IsRemote = true
+			if host == "" && port == 0 {
+				params.IsRemote = false
+			}
+
+			ctx := cmd.Context()
+			executor := tmpl.NewExecutor(&params)
+
+			// write templates
+			templates := make([]*tmpl.Template, len(templatesInput))
+			for i, pathIn := range templatesInput {
+				pathOut := path.Join(
+					curDir,
+					name,
+					strings.TrimSuffix(strings.TrimPrefix(pathIn, "templates/"), ".tmpl"),
+				)
+				t, err := tmpl.NewTemplateOnFiles(pathIn, pathOut)
+				if err != nil {
+					return fmt.Errorf("error creating template: %w", err)
+				}
+				templates[i] = t
+			}
+
+			err = executor.Process(ctx, templates...)
+			if err != nil {
+				return fmt.Errorf("error generating templates: %w", err)
+			}
+
+			modCmd := exec.CommandContext(ctx, "go", "mod", "tidy")
+			modCmd.Dir = path.Join(curDir, name)
+
+			modCmd.Stderr = os.Stderr
+			modCmd.Stdout = os.Stdout
+
+			err = modCmd.Start()
+			if err != nil {
+				return fmt.Errorf("error executing 'go mod tidy' in exploit directory: %w", err)
+			}
+			err = modCmd.Wait()
+			if err != nil {
+				return fmt.Errorf("error waiting 'go mod tidy': %w", err)
+			}
+
+			cmd.Printf("Template created in directory %s\n", name)
+
+			return nil
+		},
 	}
-	curDir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
 
-	fmt.Println("Generating exploit template...")
+	cmd.Flags().StringVarP(&name, "name", "n", "exploit", "Exploit project name")
+	cmd.Flags().StringVar(&binPath, "binary", "", "Path to local binary")
+	cmd.Flags().StringVar(&host, "host", "", "Remote host")
+	cmd.Flags().Uint16Var(&port, "port", 0, "Remote port")
 
-	// prepare params
-	params := tmpl.TemplateParams{
-		Module:      Module,
-		ProjectName: name,
-		Version:     Version,
-		BinPath:     path.Join(curDir, name, binPath),
-		Host:        host,
-		Port:        port,
-	}
-	params.IsRemote = true
-	if host == "" && port == 0 {
-		params.IsRemote = false
-	}
-
-	ctx := cmd.Context()
-	executor := tmpl.NewExecutor(&params)
-
-	// write templates
-	templates := make([]*tmpl.Template, len(templatesInput))
-	for i, pathIn := range templatesInput {
-		pathOut := path.Join(
-			curDir,
-			name,
-			strings.TrimSuffix(strings.TrimPrefix(pathIn, "templates/"), ".tmpl"),
-		)
-		t, err := tmpl.NewTemplateOnFiles(pathIn, pathOut)
-		if err != nil {
-			return err
-		}
-		templates[i] = t
-	}
-
-	err = executor.Process(ctx, templates...)
-	if err != nil {
-		return err
-	}
-
-	modCmd := exec.CommandContext(ctx, "go", "mod", "tidy")
-	modCmd.Dir = path.Join(curDir, name)
-
-	modCmd.Stderr = os.Stderr
-	modCmd.Stdout = os.Stdout
-
-	err = modCmd.Start()
-	if err != nil {
-		return err
-	}
-	err = modCmd.Wait()
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Template created in directory %s\n", name)
-
-	return nil
+	return cmd
 }
 
 func validateTargetFlags() error {
@@ -146,10 +159,6 @@ func validateName(name string) error {
 }
 
 func init() {
+	templateCmd := NewTemplateCmd(Version, Module)
 	rootCmd.AddCommand(templateCmd)
-
-	templateCmd.Flags().StringVarP(&name, "name", "n", "exploit", "Exploit project name")
-	templateCmd.Flags().StringVar(&binPath, "binary", "", "Path to local binary")
-	templateCmd.Flags().StringVar(&host, "host", "", "Remote host")
-	templateCmd.Flags().Uint16Var(&port, "port", 0, "Remote port")
 }

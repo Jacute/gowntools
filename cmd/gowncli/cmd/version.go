@@ -1,15 +1,13 @@
 package cmd
 
 import (
-	"fmt"
 	"runtime/debug"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	Version = "dev"
-	Module  = "unknown_module"
+	Version, Module string
 )
 
 func init() {
@@ -21,15 +19,18 @@ func init() {
 	}
 }
 
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "print version of gowntools",
-	Run: func(_ *cobra.Command, _ []string) {
-		fmt.Println("version:", Version)
-		fmt.Println("library module:", Module)
-	},
+func NewVersionCmd(version, module string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: "print version of gowntools",
+		Run: func(cmd *cobra.Command, _ []string) {
+			cmd.Println("version:", version)
+			cmd.Println("library module:", module)
+		},
+	}
+	return cmd
 }
 
 func init() {
-	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(NewTemplateCmd(Version, Module))
 }
