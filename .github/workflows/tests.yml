@@ -18,8 +18,8 @@ jobs:
         with:
           go-version: '1.25.5'
       
-      - name: Install nasm & gdb & xterm
-        run: sudo apt-get update && sudo apt-get install -y nasm gdb xterm
+      - name: Install nasm
+        run: sudo apt-get update && sudo apt-get install -y nasm
       
       - name: Install gocovmerge
         run: go install github.com/wadey/gocovmerge@latest
