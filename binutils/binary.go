@@ -23,6 +23,7 @@ var (
 	ErrUnknownBinary  = errors.New("binary type is unknown")
 	ErrStringNotFound = errors.New("string not found")
 	ErrGadgetNotFound = errors.New("gadget not found")
+	ErrSymbolNotFound = errors.New("symbol not found")
 )
 
 type OS string
@@ -66,7 +67,7 @@ type gadget struct {
 	len   int
 }
 
-type binaryInfo struct {
+type BinaryInfo struct {
 	Arch          Arch
 	OS            OS
 	Compiler      string
@@ -78,7 +79,7 @@ type binaryInfo struct {
 	// Language string
 }
 
-func (bi *binaryInfo) String() string {
+func (bi *BinaryInfo) String() string {
 	var builder strings.Builder
 
 	builder.WriteString("=== BINARY INFO ===\n")
@@ -138,7 +139,7 @@ func (bi *binaryInfo) String() string {
 
 type Binary interface {
 	// Info returns binary info like arch, os, compiler, security mitigations, etc
-	Info() *binaryInfo
+	Info() *BinaryInfo
 
 	// GetSymbolAddr returns the address of the symbol with the given name.
 	// If the symbol is not found, an error is returned.

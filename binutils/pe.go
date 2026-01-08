@@ -6,10 +6,10 @@ import (
 )
 
 type peBinary struct {
-	info *binaryInfo
+	info *BinaryInfo
 }
 
-func (bin *peBinary) Info() *binaryInfo {
+func (bin *peBinary) Info() *BinaryInfo {
 	return bin.info
 }
 
@@ -25,9 +25,9 @@ func (bin *peBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
 	panic("not implemented")
 }
 
-func scanPE(f *pe.File) (Binary, error) {
+func scanPE(f *pe.File) (*peBinary, error) {
 	bin := &peBinary{
-		info: &binaryInfo{
+		info: &BinaryInfo{
 			OS:        OSWindows,
 			Arch:      peArch(f.Machine),
 			ByteOrder: binary.LittleEndian,

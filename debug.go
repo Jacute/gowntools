@@ -100,34 +100,24 @@ func WithGDBScript(script string) func(*debugger) {
 	}
 }
 
+// getTerminal check existing of terminals by priority:
+// gnome-terminal -> tmux -> xterm
 func getTerminal() ([]string, error) {
-	gnomeEnv := os.Getenv("GNOME_TERMINAL_SCREEN")
-	if gnomeEnv != "" {
+	if _, err := exec.LookPath("gnome-terminal"); err == nil {
 		return GnomeTerminal, nil
 	}
 	tmuxEnv := os.Getenv("TMUX")
 	if tmuxEnv != "" {
 		return TmuxTerminal, nil
 	}
-	termEnv := os.Getenv("TERM")
-	if strings.HasPrefix(termEnv, "xterm") {
+	if _, err := exec.LookPath("xterm"); err == nil {
 		return XtermTerminal, nil
 	}
 	return nil, ErrTerminalNotFound
 }
 
 func (d *debugger) start() error {
-	gdbCmd := []string{
-		"gdb",
-		"-q",
-	}
-	if len(d.gdbCommands) != 0 {
-		for _, cmd := range d.gdbCommands {
-			gdbCmd = append(gdbCmd, "-ex", cmd)
-		}
-	}
-	gdbCmd = append(gdbCmd, "-p", fmt.Sprintf("%d", d.attachPid))
-
+	gdbCmd := d.buildGDBcmd()
 	args := append(d.term[1:], gdbCmd...)
 	cmd := exec.Command(d.term[0], args...)
 
@@ -162,4 +152,18 @@ func (d *debugger) waitForAttach(timeout time.Duration) error {
 	}
 
 	return fmt.Errorf("timeout waiting for gdb attach")
+}
+
+func (d *debugger) buildGDBcmd() []string {
+	gdbCmd := []string{
+		"gdb",
+		"-q",
+	}
+	if len(d.gdbCommands) != 0 {
+		for _, cmd := range d.gdbCommands {
+			gdbCmd = append(gdbCmd, "-ex", cmd)
+		}
+	}
+	gdbCmd = append(gdbCmd, "-p", fmt.Sprintf("%d", d.attachPid))
+	return gdbCmd
 }
