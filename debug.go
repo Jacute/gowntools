@@ -100,17 +100,17 @@ func WithGDBScript(script string) func(*debugger) {
 	}
 }
 
+// getTerminal check existing of terminals by priority:
+// gnome-terminal -> tmux -> xterm
 func getTerminal() ([]string, error) {
-	gnomeEnv := os.Getenv("GNOME_TERMINAL_SCREEN")
-	if gnomeEnv != "" {
+	if _, err := exec.LookPath("gnome-terminal"); err == nil {
 		return GnomeTerminal, nil
 	}
 	tmuxEnv := os.Getenv("TMUX")
 	if tmuxEnv != "" {
 		return TmuxTerminal, nil
 	}
-	termEnv := os.Getenv("TERM")
-	if strings.HasPrefix(termEnv, "xterm") {
+	if _, err := exec.LookPath("xterm"); err == nil {
 		return XtermTerminal, nil
 	}
 	return nil, ErrTerminalNotFound
