@@ -27,7 +27,7 @@ func (bi *elfBinary) Info() *BinaryInfo {
 func (bi *elfBinary) GetSymbolAddr(symbolName string) (Addr, error) {
 	symbol, ok := bi.symbols[symbolName]
 	if !ok {
-		return 0, fmt.Errorf("symbol %s not found", symbolName)
+		return 0, ErrSymbolNotFound
 	}
 
 	return Addr(symbol.Value), nil

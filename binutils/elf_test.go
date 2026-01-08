@@ -154,19 +154,29 @@ func TestScanELF(t *testing.T) {
 
 func TestGetSymbolAddrELF(t *testing.T) {
 	testcases := []struct {
-		name     string
-		path     string
-		expected Addr
+		name         string
+		path         string
+		symbolName   string
+		expectedAddr Addr
+		expectedErr  error
 	}{
 		{
-			name:     "static",
-			path:     "./testdata/linux_amd64/static_main",
-			expected: Addr(0x0000000000401905),
+			name:         "static",
+			path:         "./testdata/linux_amd64/static_main",
+			symbolName:   "win",
+			expectedAddr: Addr(0x0000000000401905),
 		},
 		{
-			name:     "dynamic",
-			path:     "./testdata/linux_amd64/dynamic_main",
-			expected: Addr(0x00000000000011a9),
+			name:         "dynamic",
+			path:         "./testdata/linux_amd64/dynamic_main",
+			symbolName:   "win",
+			expectedAddr: Addr(0x00000000000011a9),
+		},
+		{
+			name:        "not found",
+			path:        "./testdata/linux_amd64/dynamic_main",
+			symbolName:  "dasjosojdasj",
+			expectedErr: ErrSymbolNotFound,
 		},
 	}
 
@@ -175,9 +185,9 @@ func TestGetSymbolAddrELF(t *testing.T) {
 			bn, err := AnalyzeBinary(tc.path)
 			require.NoError(tt, err)
 
-			addr, err := bn.GetSymbolAddr("win")
-			require.NoError(tt, err)
-			require.Equal(tt, tc.expected, addr)
+			addr, err := bn.GetSymbolAddr(tc.symbolName)
+			require.ErrorIs(tt, err, tc.expectedErr)
+			require.Equal(tt, tc.expectedAddr, addr)
 		})
 	}
 }

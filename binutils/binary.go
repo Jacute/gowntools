@@ -23,6 +23,7 @@ var (
 	ErrUnknownBinary  = errors.New("binary type is unknown")
 	ErrStringNotFound = errors.New("string not found")
 	ErrGadgetNotFound = errors.New("gadget not found")
+	ErrSymbolNotFound = errors.New("symbol not found")
 )
 
 type OS string
