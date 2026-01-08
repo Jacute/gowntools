@@ -87,6 +87,9 @@ func NewTemplateCmd(version, module string) *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("error creating template: %w", err)
 				}
+				defer func() {
+					_ = t.Close()
+				}()
 				templates[i] = t
 			}
 

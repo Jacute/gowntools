@@ -189,6 +189,9 @@ func (pb *Builder) FmtReadStack(stackAddr binutils.Addr, leakAddrs ...binutils.A
 	}
 
 	for _, leakAddr := range leakAddrs {
+		if leakAddr <= stackAddr {
+			panic("leakAddr must be greater than stackAddr")
+		}
 		offset := leakAddr - stackAddr
 		number := uint64(offset) / uint64(pb.arch.Bitness/8)
 		number += 6 // add to number the first 6 arguments for amd64 calling convention

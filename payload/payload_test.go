@@ -66,4 +66,65 @@ func TestBuilder(t *testing.T) {
 		require.Equal(tt, 1, pb.Len())
 		require.Equal(tt, []byte{0x10}, payload2)
 	})
+
+	t.Run("padTo bigEndian", func(tt *testing.T) {
+		pb := NewBuilder(binutils.ArchArm32, binary.BigEndian)
+		pb.Addr(0x12345678)
+		err := pb.PadTo(0x00, 6)
+
+		require.NoError(tt, err)
+		require.Equal(tt, []byte{
+			0x12, 0x34, 0x56, 0x78,
+			0x00, 0x00,
+		}, pb.Build())
+
+		err = pb.PadTo(0x00, 1)
+		require.ErrorIs(tt, ErrPayloadBiggerThenPaddingLength, err)
+	})
+
+	t.Run("fmt read register", func(tt *testing.T) {
+		pb := NewBuilder(binutils.ArchAmd64, binary.LittleEndian)
+
+		require.Equal(tt, byte('-'), pb.Delimiter())
+
+		pb.FmtReadRegister("rdi")
+		pb.FmtReadRegister("rsi")
+
+		require.Equal(tt, []byte("%1$p-%2$p-"), pb.Build())
+	})
+
+	t.Run("fmt read stack", func(tt *testing.T) {
+		pb := NewBuilder(binutils.ArchAmd64, binary.LittleEndian)
+
+		require.Equal(tt, byte('-'), pb.Delimiter())
+
+		pb.FmtReadStack(
+			binutils.Addr(0x0102030405060708),
+			binutils.Addr(0x0102030405060710),
+			binutils.Addr(0x0102030405060718),
+			binutils.Addr(0x0102030405060720),
+		)
+
+		require.Equal(tt, []byte("%7$p-%8$p-%9$p-"), pb.Build())
+	})
+
+	t.Run("fmt read stack leakAddr >= stackAddr", func(tt *testing.T) {
+		pb := NewBuilder(binutils.ArchAmd64, binary.LittleEndian)
+		require.Panics(tt, func() {
+			pb.FmtReadStack(
+				binutils.Addr(0x0102030405060708),
+				binutils.Addr(0x0102030405060700),
+			)
+		})
+	})
+
+	t.Run("fmt arm arch", func(tt *testing.T) {
+		pb := NewBuilder(binutils.ArchArm32, binary.LittleEndian)
+		require.Panics(tt, func() {
+			pb.FmtReadStack(
+				binutils.Addr(0x0102030405060708),
+				binutils.Addr(0x0102030405060710),
+			)
+		})
+	})
 }
