@@ -78,7 +78,7 @@ func genPayload(b *payload.Builder) []byte {
 `,
 			expectedModFile: `module exploit123
 
-go 1.25.4
+go 1.25.5
 
 require github.com/Jacute/gowntools v1.3.3.7
 `,
@@ -142,7 +142,7 @@ func genPayload(b *payload.Builder) []byte {
 `,
 			expectedModFile: `module exploit322
 
-go 1.25.4
+go 1.25.5
 
 require github.com/Jacute/gowntools v3.2.2
 `,
@@ -200,7 +200,7 @@ func genPayload(b *payload.Builder) []byte {
 `,
 			expectedModFile: `module exploit322
 
-go 1.25.4
+go 1.25.5
 
 require github.com/Jacute/gowntools v3.2.2
 `,

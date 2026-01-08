@@ -49,6 +49,6 @@ For finding gadgets:
 
 ## Documentation
 
-> ⚠️ **Now library supports only amd64 CPU architecture**
+> ⚠️ **Now library supports to analyze only ELF binaries**
 
 https://pkg.go.dev/github.com/Jacute/gowntools
