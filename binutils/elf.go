@@ -84,14 +84,15 @@ func scanELF(f *elf.File) (*elfBinary, error) {
 	}
 
 	commentSec, err := getELFSection(f.Sections, ".comment")
-	if err != nil {
-		return nil, fmt.Errorf("error getting .comment section: %w", err)
+	if err == nil {
+		compiler, err := getELFCompiler(commentSec)
+		if err != nil {
+			return nil, fmt.Errorf("error getting compiler: %w", err)
+		}
+		bin.info.Compiler = compiler
+	} else {
+		bin.info.Compiler = "Not Found"
 	}
-	compiler, err := getELFCompiler(commentSec)
-	if err != nil {
-		return nil, fmt.Errorf("error getting compiler: %w", err)
-	}
-	bin.info.Compiler = compiler
 
 	dynamic, err := getELFSection(f.Sections, ".dynamic")
 	if dynamic == nil && err != nil {
