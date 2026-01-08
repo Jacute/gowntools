@@ -13,7 +13,7 @@ coverage:
 	@echo "$(GREEN)Running tests...$(RESET)"
 	
 	@PKGS=$$(go list ./... | grep -vE ${TEST_EXCLUDE} || true) && \
-	if [ -z "$$PKGS" ]; then echo "No packages found in jacfarm-api"; exit 0; fi && \
+	if [ -z "$$PKGS" ]; then echo "No packages found in gowntools"; exit 0; fi && \
 	CSV=$$(echo $$PKGS | tr ' ' ',') && \
 	echo -e "Running go tests for:\n$(PURPLE)$$PKGS$(RESET)" && \
 	go test -tags=ci -coverpkg=$$CSV -coverprofile=${COVERAGE_SCHEMA_FILE} -timeout=40s $$PKGS
