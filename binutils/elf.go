@@ -186,7 +186,6 @@ func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, er
 }
 
 func loadELFGadgets(progs []*elf.Prog, arch Arch) (map[gadget][]Addr, error) {
-	const gadgetTerminatorOp = x86asm.RET // "ret" instruction
 	const gadgetTerminatorOpcode = '\xc3' // TODO: add other ret terminators
 
 	gadgets := make(map[gadget][]Addr)
@@ -279,7 +278,12 @@ func isNXEnableELF(progs []*elf.Prog) bool {
 	return nx
 }
 
-func scanRelRoELF(arch Arch, progs []*elf.Prog, dynamic *elf.Section, order binary.ByteOrder) (RelRo, error) {
+func scanRelRoELF(
+	arch Arch,
+	progs []*elf.Prog,
+	dynamic *elf.Section,
+	order binary.ByteOrder,
+) (RelRo, error) {
 	ptGnuRelRoEnable := false
 	for _, prog := range progs {
 		if prog.Type == elf.PT_GNU_RELRO {

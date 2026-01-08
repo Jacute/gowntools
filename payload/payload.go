@@ -2,10 +2,9 @@ package payload
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"strconv"
-
-	"encoding/binary"
 
 	"github.com/Jacute/gowntools/binutils"
 )

@@ -59,7 +59,11 @@ func (e *Executor) Process(ctx context.Context, templates ...*Template) error {
 	return <-errCh
 }
 
-func (e *Executor) prepareTemplates(ctx context.Context, execCh chan *Template, templates ...*Template) error {
+func (e *Executor) prepareTemplates(
+	ctx context.Context,
+	execCh chan *Template,
+	templates ...*Template,
+) error {
 	for _, tmpl := range templates {
 		select {
 		case <-ctx.Done():

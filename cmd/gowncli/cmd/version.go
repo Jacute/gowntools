@@ -24,7 +24,7 @@ func init() {
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "print version of gowntools",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		fmt.Println("version:", Version)
 		fmt.Println("library module:", Module)
 	},

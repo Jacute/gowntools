@@ -37,13 +37,13 @@ var (
 var templateCmd = &cobra.Command{
 	Use:   "template",
 	Short: "generation of exploit templates",
-	PreRunE: func(cmd *cobra.Command, args []string) error {
+	PreRunE: func(_ *cobra.Command, _ []string) error {
 		return validateTargetFlags()
 	},
 	RunE: genTemplate,
 }
 
-func genTemplate(cmd *cobra.Command, args []string) error {
+func genTemplate(cmd *cobra.Command, _ []string) error {
 	if err := validateName(name); err != nil {
 		return err
 	}

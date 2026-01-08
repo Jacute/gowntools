@@ -37,7 +37,10 @@ func (ts *UDPServer) Listen() {
 		if err != nil {
 			continue
 		}
-		ts.server.WriteToUDP([]byte(fmt.Sprintf("echo: %s", buf[:n])), addr)
+		_, err = ts.server.WriteToUDP([]byte(fmt.Sprintf("echo: %s", buf[:n])), addr)
+		if err != nil {
+			fmt.Printf("error writing: %s", err.Error())
+		}
 	}
 }
 
