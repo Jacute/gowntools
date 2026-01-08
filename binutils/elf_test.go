@@ -20,6 +20,7 @@ func TestScanELF(t *testing.T) {
 		expectedSecurity      *SecurityInfo
 		expectedErr           error
 	}{
+		// AMD64
 		{
 			name:                  "static linking | gcc amd64 linux",
 			path:                  "./testdata/linux_amd64/static_main",
@@ -80,12 +81,45 @@ func TestScanELF(t *testing.T) {
 				NXEnable:     false,
 			},
 		},
+		// X86
 		{
 			name:                  "gcc x86 linux",
-			path:                  "./testdata/linux_x86/app32",
+			path:                  "./testdata/linux_x86/x86",
 			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
 			expectedOS:            OSLinux,
 			expectedArch:          ArchI386,
+			expectedStaticLinking: false,
+			expectedByteOrder:     binary.LittleEndian,
+			expectedSecurity: &SecurityInfo{
+				RelRo:        RelRoEnable,
+				CanaryEnable: true,
+				PIEEnable:    true,
+				NXEnable:     true,
+			},
+		},
+		// ARM32
+		{
+			name:                  "gcc arm32 linux",
+			path:                  "./testdata/linux_arm32/arm32",
+			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+			expectedOS:            OSLinux,
+			expectedArch:          ArchArm32,
+			expectedStaticLinking: false,
+			expectedByteOrder:     binary.LittleEndian,
+			expectedSecurity: &SecurityInfo{
+				RelRo:        RelRoEnable,
+				CanaryEnable: true,
+				PIEEnable:    true,
+				NXEnable:     true,
+			},
+		},
+		// ARM64
+		{
+			name:                  "gcc arm64 linux",
+			path:                  "./testdata/linux_arm64/arm64",
+			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+			expectedOS:            OSLinux,
+			expectedArch:          ArchArm64,
 			expectedStaticLinking: false,
 			expectedByteOrder:     binary.LittleEndian,
 			expectedSecurity: &SecurityInfo{

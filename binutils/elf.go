@@ -300,8 +300,8 @@ func scanRelRoELF(arch Arch, progs []*elf.Prog, dynamic *elf.Section, order bina
 
 loop:
 	for {
-		switch arch {
-		case ArchAmd64:
+		switch arch.Bitness {
+		case 64:
 			var dyn elf.Dyn64
 			if err := binary.Read(r, order, &dyn); err != nil {
 				if err == io.EOF {
@@ -314,7 +314,7 @@ loop:
 				return RelRoEnable, nil
 			}
 
-		case ArchI386:
+		case 32:
 			var dyn elf.Dyn32
 			if err := binary.Read(r, order, &dyn); err != nil {
 				if err == io.EOF {
