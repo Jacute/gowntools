@@ -1,10 +1,122 @@
 package binutils
 
 import (
+	"debug/elf"
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestScanELF(t *testing.T) {
+	testcases := []struct {
+		name                  string
+		path                  string
+		expectedCompiler      string
+		expectedOS            OS
+		expectedArch          Arch
+		expectedStaticLinking bool
+		expectedByteOrder     binary.ByteOrder
+		expectedSecurity      *SecurityInfo
+		expectedErr           error
+	}{
+		{
+			name:                  "static linking | gcc amd64 linux",
+			path:                  "./testdata/linux_amd64/static_main",
+			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+			expectedOS:            OSLinux,
+			expectedArch:          ArchAmd64,
+			expectedStaticLinking: true,
+			expectedByteOrder:     binary.LittleEndian,
+			expectedSecurity: &SecurityInfo{
+				RelRo:        RelRoPartial,
+				CanaryEnable: true,
+				PIEEnable:    false,
+				NXEnable:     true,
+			},
+		},
+		{
+			name:                  "dynamic linking with all defs | gcc amd64 linux",
+			path:                  "./testdata/linux_amd64/dynamic_main",
+			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+			expectedOS:            OSLinux,
+			expectedArch:          ArchAmd64,
+			expectedStaticLinking: false,
+			expectedByteOrder:     binary.LittleEndian,
+			expectedSecurity: &SecurityInfo{
+				RelRo:        RelRoEnable,
+				CanaryEnable: true,
+				PIEEnable:    true,
+				NXEnable:     true,
+			},
+		},
+		{
+			name:                  "dynamic linking without pie | gcc amd64 linux",
+			path:                  "./testdata/linux_amd64/no_pie_main",
+			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+			expectedOS:            OSLinux,
+			expectedArch:          ArchAmd64,
+			expectedStaticLinking: false,
+			expectedByteOrder:     binary.LittleEndian,
+			expectedSecurity: &SecurityInfo{
+				RelRo:        RelRoPartial,
+				CanaryEnable: true,
+				PIEEnable:    false,
+				NXEnable:     true,
+			},
+		},
+		{
+			name:                  "dynamic linking without defs | gcc amd64 linux",
+			path:                  "./testdata/linux_amd64/no_defs_main",
+			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+			expectedOS:            OSLinux,
+			expectedArch:          ArchAmd64,
+			expectedStaticLinking: false,
+			expectedByteOrder:     binary.LittleEndian,
+			expectedSecurity: &SecurityInfo{
+				RelRo:        RelRoDisable,
+				CanaryEnable: false,
+				PIEEnable:    false,
+				NXEnable:     false,
+			},
+		},
+		{
+			name:                  "gcc x86 linux",
+			path:                  "./testdata/linux_x86/app32",
+			expectedCompiler:      "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+			expectedOS:            OSLinux,
+			expectedArch:          ArchI386,
+			expectedStaticLinking: false,
+			expectedByteOrder:     binary.LittleEndian,
+			expectedSecurity: &SecurityInfo{
+				RelRo:        RelRoEnable,
+				CanaryEnable: true,
+				PIEEnable:    true,
+				NXEnable:     true,
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(tt *testing.T) {
+			f, err := elf.Open(tc.path)
+			if err != nil {
+				tt.Fatalf("failed to open ELF file: %v", err)
+			}
+
+			bin, err := scanELF(f)
+			require.ErrorIs(tt, err, tc.expectedErr)
+
+			info := bin.Info()
+			require.Equal(tt, tc.expectedArch, info.Arch)
+			require.Equal(tt, tc.expectedOS, info.OS)
+			require.Equal(tt, tc.expectedCompiler, info.Compiler)
+			require.Equal(tt, tc.expectedStaticLinking, info.StaticLinking)
+			require.Equal(tt, tc.expectedByteOrder, info.ByteOrder)
+			require.Equal(tt, tc.expectedSecurity, info.Security)
+		})
+	}
+}
 
 func TestGetSymbolAddrELF(t *testing.T) {
 	testcases := []struct {

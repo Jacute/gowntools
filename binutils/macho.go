@@ -22,7 +22,7 @@ func (bin *machoBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
 	panic("not implemented")
 }
 
-func scanMacho(f *macho.File) (bin Binary, err error) {
+func scanMacho(f *macho.File) (bin *machoBinary, err error) {
 	bin = &machoBinary{
 		info: &BinaryInfo{
 			OS:        OSMac,

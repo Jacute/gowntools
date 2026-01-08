@@ -1,8 +1,10 @@
 package binutils
 
 import (
+	"bufio"
 	"bytes"
 	"debug/elf"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -69,7 +71,7 @@ func (bi *elfBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
 	return addrs, nil
 }
 
-func scanELF(f *elf.File) (Binary, error) {
+func scanELF(f *elf.File) (*elfBinary, error) {
 	bin := &elfBinary{
 		info: &BinaryInfo{
 			OS:        OSLinux,
@@ -81,20 +83,13 @@ func scanELF(f *elf.File) (Binary, error) {
 		},
 	}
 
-	var compiler string
-	for _, sec := range f.Sections {
-		if sec.Name == ".comment" {
-			f := sec.Open()
-			data, err := io.ReadAll(f)
-			if err != nil {
-				return nil, err
-			}
-			compiler = string(data)
-			if compiler[len(compiler)-1] == '\x00' {
-				compiler = compiler[:len(compiler)-1]
-			}
-			break
-		}
+	commentSec, err := getELFSection(f.Sections, ".comment")
+	if err != nil {
+		return nil, fmt.Errorf("error getting .comment section: %w", err)
+	}
+	compiler, err := getELFCompiler(commentSec)
+	if err != nil {
+		return nil, fmt.Errorf("error getting compiler: %w", err)
 	}
 	bin.info.Compiler = compiler
 
@@ -106,25 +101,25 @@ func scanELF(f *elf.File) (Binary, error) {
 
 	symbols, err := loadELFSymbols(f, bin.info.StaticLinking)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error loading symbols: %w", err)
 	}
 	bin.symbols = symbols
 
-	gadgets, err := loadELFGadgets(f, bin.info.Arch)
+	gadgets, err := loadELFGadgets(f.Progs, bin.info.Arch)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error loading gadgets: %w", err)
 	}
 	bin.gadgets = gadgets
 
-	bin.info.Security.RelRo, err = scanRelRo(f, dynamic, bin.info.ByteOrder)
+	bin.info.Security.RelRo, err = scanRelRoELF(bin.info.Arch, f.Progs, dynamic, bin.info.ByteOrder)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error scanning relro: %w", err)
 	}
 	bin.info.Security.PIEEnable = f.Type == elf.ET_DYN
 	if _, ok := symbols["__stack_chk_fail"]; ok {
 		bin.info.Security.CanaryEnable = true
 	}
-	bin.info.Security.NXEnable = isNXEnable(f.Progs)
+	bin.info.Security.NXEnable = isNXEnableELF(f.Progs)
 
 	return bin, nil
 }
@@ -142,6 +137,21 @@ func elfArch(m elf.Machine) Arch {
 	default:
 		return ArchUnknown
 	}
+}
+
+func getELFCompiler(commentSection *elf.Section) (string, error) {
+	f := commentSection.Open()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return "", fmt.Errorf("error reading .comment section to get compiler: %w", err)
+	}
+
+	compiler := string(data)
+	if compiler[len(compiler)-1] == '\x00' {
+		compiler = compiler[:len(compiler)-1]
+	}
+
+	return compiler, nil
 }
 
 func getELFSection(sections []*elf.Section, name string) (*elf.Section, error) {
@@ -162,7 +172,7 @@ func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, er
 	if !staticLinking {
 		dynSyms, err := f.DynamicSymbols()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error loading dynamic symbols: %w", err)
 		}
 		syms = append(syms, dynSyms...)
 	}
@@ -175,12 +185,12 @@ func loadELFSymbols(f *elf.File, staticLinking bool) (map[string]*elf.Symbol, er
 	return symbols, nil
 }
 
-func loadELFGadgets(f *elf.File, arch Arch) (map[gadget][]Addr, error) {
+func loadELFGadgets(progs []*elf.Prog, arch Arch) (map[gadget][]Addr, error) {
 	const gadgetTerminatorOp = x86asm.RET // "ret" instruction
 	const gadgetTerminatorOpcode = '\xc3' // TODO: add other ret terminators
 
 	gadgets := make(map[gadget][]Addr)
-	for _, p := range f.Progs {
+	for _, p := range progs {
 		if p.Type != elf.PT_LOAD || (p.Flags&elf.PF_X) == 0 {
 			continue
 		}
@@ -188,7 +198,7 @@ func loadELFGadgets(f *elf.File, arch Arch) (map[gadget][]Addr, error) {
 		r := p.Open()
 		code, err := io.ReadAll(r)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error reading program: %w", err)
 		}
 
 		for i := range code {
@@ -244,7 +254,7 @@ func getELFDataSections(f *elf.File) []*elf.Section {
 func findStringInELFSection(section *elf.Section, str string) (Addr, error) {
 	data, err := section.Data()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("error reading section %s: %w", section.Name, err)
 	}
 
 	stringBytes := append([]byte(str), '\x00')
@@ -255,6 +265,70 @@ func findStringInELFSection(section *elf.Section, str string) (Addr, error) {
 		}
 	}
 
-	var nilAddr Addr
-	return nilAddr, ErrStringNotFound
+	return 0, ErrStringNotFound
+}
+
+func isNXEnableELF(progs []*elf.Prog) bool {
+	nx := true
+	for _, prog := range progs {
+		if prog.Type == elf.PT_GNU_STACK && prog.Flags&elf.PF_X != 0 {
+			nx = false
+			break
+		}
+	}
+	return nx
+}
+
+func scanRelRoELF(arch Arch, progs []*elf.Prog, dynamic *elf.Section, order binary.ByteOrder) (RelRo, error) {
+	ptGnuRelRoEnable := false
+	for _, prog := range progs {
+		if prog.Type == elf.PT_GNU_RELRO {
+			ptGnuRelRoEnable = true
+			break
+		}
+	}
+
+	if !ptGnuRelRoEnable {
+		return RelRoDisable, nil
+	}
+
+	if dynamic == nil {
+		return RelRoPartial, nil
+	}
+
+	r := bufio.NewReader(dynamic.Open())
+
+loop:
+	for {
+		switch arch {
+		case ArchAmd64:
+			var dyn elf.Dyn64
+			if err := binary.Read(r, order, &dyn); err != nil {
+				if err == io.EOF {
+					break loop
+				}
+				return RelRoUnknown, err
+			}
+
+			if dyn.Tag == int64(elf.DT_FLAGS) && dyn.Val&uint64(elf.DF_BIND_NOW) != 0 {
+				return RelRoEnable, nil
+			}
+
+		case ArchI386:
+			var dyn elf.Dyn32
+			if err := binary.Read(r, order, &dyn); err != nil {
+				if err == io.EOF {
+					break loop
+				}
+				return RelRoUnknown, err
+			}
+			if dyn.Tag == int32(elf.DT_FLAGS) && dyn.Val&uint32(elf.DF_BIND_NOW) != 0 {
+				return RelRoEnable, nil
+			}
+		default:
+			return RelRoUnknown, fmt.Errorf("unknown arch: %s", arch.Name)
+		}
+	}
+
+	return RelRoPartial, nil
 }

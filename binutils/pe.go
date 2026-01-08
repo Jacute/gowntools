@@ -25,7 +25,7 @@ func (bin *peBinary) GetGadgetAddr(instructions []string) ([]Addr, error) {
 	panic("not implemented")
 }
 
-func scanPE(f *pe.File) (Binary, error) {
+func scanPE(f *pe.File) (*peBinary, error) {
 	bin := &peBinary{
 		info: &BinaryInfo{
 			OS:        OSWindows,
