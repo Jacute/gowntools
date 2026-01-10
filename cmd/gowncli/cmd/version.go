@@ -32,5 +32,5 @@ func NewVersionCmd(version, module string) *cobra.Command {
 }
 
 func init() {
-	rootCmd.AddCommand(NewTemplateCmd(Version, Module))
+	rootCmd.AddCommand(NewVersionCmd(Version, Module))
 }
