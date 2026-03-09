@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	Version, Module string
+	Version string = "v0.0.7"
+	Module  string = "github.com/Jacute/gowntools"
 )
 
 func init() {
