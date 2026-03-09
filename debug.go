@@ -24,9 +24,10 @@ var (
 )
 
 type debugger struct {
-	gdbCommands []string
-	term        terminal
-	attachPid   int
+	gdbCommands  []string
+	debuggerName string
+	term         terminal
+	attachPid    int
 }
 
 type option func(*debugger)
@@ -53,7 +54,8 @@ func Debug(client Client, opts ...option) {
 
 	// init debugger
 	dbg := &debugger{
-		attachPid: bin.Pid(),
+		attachPid:    bin.Pid(),
+		debuggerName: "gdb",
 	}
 	for _, opt := range opts {
 		opt(dbg)
@@ -97,6 +99,21 @@ func WithTerminal(term terminal) func(*debugger) {
 func WithGDBScript(script string) func(*debugger) {
 	return func(client *debugger) {
 		client.gdbCommands = strings.Split(script, "\n")
+	}
+}
+
+// WithCustomDebugger returns an option that sets the name of the debugger to
+// use when attaching to the process. This can be useful for debugging binaries
+// that require a specific debugger to be used.
+// The name of the debugger should be the name of the executable that can be
+// found in the system's PATH.
+//
+// Default: gdb
+func WithCustomDebugger(dbgName string) func(*debugger) {
+	return func(client *debugger) {
+		if dbgName != "" {
+			client.debuggerName = dbgName
+		}
 	}
 }
 
