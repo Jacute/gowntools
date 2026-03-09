@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	Version, Module string
+	Version string = "v0.0.7"
+	Module  string = "github.com/Jacute/gowntools"
 )
 
 func init() {
@@ -32,5 +33,5 @@ func NewVersionCmd(version, module string) *cobra.Command {
 }
 
 func init() {
-	rootCmd.AddCommand(NewTemplateCmd(Version, Module))
+	rootCmd.AddCommand(NewVersionCmd(Version, Module))
 }
