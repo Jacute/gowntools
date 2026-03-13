@@ -65,7 +65,7 @@ func TestReadAll(t *testing.T) {
 	require.Equal(t, 6, n)
 
 	// read all
-	out, n, err := c.ReadAll()
+	out, err := c.ReadAll()
 	require.NoError(t, err)
 	require.Equal(t, "hello\necho: aboba\n", string(out))
 	require.Equal(t, 18, n)

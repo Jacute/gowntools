@@ -80,27 +80,10 @@ func (c *conn) Read(b []byte) (n int, err error) {
 // ReadAll reads data from the connection until it reaches the end of
 // the connection (EOF). The function returns the data read from the
 // connection and the number of bytes read.
-func (c *conn) ReadAll() (out []byte, n int, err error) {
-	tmp := make([]byte, 64)
-
-	var connN int
-	for {
-		connN, err = c.conn.Read(tmp)
-		if connN > 0 {
-			out = append(out, tmp[:connN]...)
-			n += connN
-		}
-		if err != nil {
-			if err == io.EOF {
-				return out, n, nil
-			}
-			return nil, 0, err
-		}
-
-		if connN == 0 {
-			return out, n, nil
-		}
-	}
+//
+// Limit on data is 10 MB
+func (c *conn) ReadAll() (out []byte, err error) {
+	return io.ReadAll(io.LimitReader(c.conn, 10<<20))
 }
 
 // ReadUntil reads data from the connection until it finds the given data.

@@ -8,7 +8,7 @@ import (
 type Client interface {
 	io.ReadWriteCloser
 
-	ReadAll() (out []byte, n int, err error)
+	ReadAll() (out []byte, err error)
 	ReadUntil(data []byte) (out []byte, err error)
 	ReadLine() (out []byte, err error)
 	ReadStringLine() (string, error)
