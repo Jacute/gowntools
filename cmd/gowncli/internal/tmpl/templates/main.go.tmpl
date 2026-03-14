@@ -1,14 +1,14 @@
 package main
 
 import (
-	{{- if not .BinPath }}
+	{{- if not .HasBinary }}
 	"encoding/binary"
 	{{ end }}
 	pwn "github.com/Jacute/gowntools"
 	"github.com/Jacute/gowntools/binutils"
 	"github.com/Jacute/gowntools/payload"
 )
-{{ if .BinPath }}
+{{ if .HasBinary }}
 const binpath string = "{{.BinPath}}"
 {{ end }}
 func main() {
@@ -19,7 +19,7 @@ func main() {
 	c := pwn.NewBinary(binpath)
 	defer c.Close()
 {{- end }}
-{{- if .BinPath }}
+{{- if .HasBinary }}
 	bin, err := binutils.AnalyzeBinary(binpath)
 	if err != nil {
 		panic(err)
@@ -32,7 +32,7 @@ func main() {
 {{ end }}
 	c.Interactive()
 }
-{{ if not .BinPath }}
+{{ if not .HasBinary }}
 func exploit(c pwn.Client) {
 	pb := payload.NewBuilder(binutils.ArchAmd64, binary.LittleEndian)
 {{- else }}

@@ -13,6 +13,7 @@ type TemplateParams struct {
 	ProjectName string
 	Version     string
 	BinPath     string
+	HasBinary   bool
 	Host        string
 	Port        uint16
 	IsRemote    bool
