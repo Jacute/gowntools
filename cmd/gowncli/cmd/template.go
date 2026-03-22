@@ -63,10 +63,15 @@ func NewTemplateCmd(version, module string) *cobra.Command {
 				Module:      module,
 				ProjectName: name,
 				Version:     version,
-				BinPath:     path.Join(exploitDir, binPath),
 				Host:        host,
 				Port:        port,
 			}
+
+			if binPath != "" {
+				params.BinPath = path.Join(exploitDir, binPath)
+				params.HasBinary = true
+			}
+
 			params.IsRemote = true
 			if host == "" && port == 0 {
 				params.IsRemote = false
